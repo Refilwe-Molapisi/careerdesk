@@ -30,7 +30,7 @@ Operations must keep working when the AI is unavailable: AI features show a clea
 
 - [x] **Prompt 1** — Scaffold, app identity (`lib/config.ts`), Supabase email auth (password + magic link) with route protection, app shell (desktop sidebar, mobile bottom tabs) with Dashboard, Jobs, Applications, Career Record, Skills, Plan, Settings. 404 page, error boundary, loading, empty states.
 - [x] **Prompt 2** — PWA: manifest, icons, service worker, offline page, install prompt.
-- [ ] **Prompt 3** — Database: SQL migrations, RLS on every table, status history and approved-document triggers, private `documents` storage bucket.
+- [x] **Prompt 3** — Database: SQL migrations, RLS on every table, status history and approved-document triggers, private `documents` storage bucket. **Verified against a local Postgres with Supabase-shaped stubs: 18/18 tests pass** (trigger timing, RLS isolation between two users, approved-document immutability, storage folder isolation, constraints).
 - [ ] **Prompt 4** — Career Record page, CV import with review, voice samples, banned phrases.
 - [ ] **Prompt 5** — Job intake with AI extraction, jobs board (kanban + table), status history, Dashboard.
 
@@ -54,6 +54,35 @@ Operations must keep working when the AI is unavailable: AI features show a clea
 4. **Create your account:** open http://localhost:3000, use *Create account* with your email and a password (or request a magic link). If Supabase has email confirmation enabled, confirm via the email first. Once your account exists, disable new sign-ups: Supabase Dashboard → Authentication → Sign In / Up → turn off **Allow new users to sign up**.
 
 5. **Supabase auth URLs** (needed for magic links): Project Settings → Auth → set **Site URL** to `http://localhost:3000` and add `http://localhost:3000/auth/callback` to **Redirect URLs**.
+
+## Database
+
+SQL migrations live in `supabase/migrations/` and run in order:
+
+| File | Creates |
+| --- | --- |
+| `0001_core_schema.sql` | career_entries, voice_samples, jobs, application_documents, applications, status_history, projects, project_deliverables, plan_items, hour_logs, weekly_reviews — RLS on every table, owner-only policies |
+| `0002_triggers.sql` | status_history written automatically on every jobs.status change (creation row on insert, transitions on update); approved/superseded application_documents locked against edit and delete (only superseding allowed) |
+| `0003_storage_documents_bucket.sql` | private `documents` bucket; users read/write only inside their own `<user_id>/` folder |
+| `0004_user_settings.sql` | user_settings with the banned-phrase list (Prompt 4) |
+| `0005_job_extraction_fields.sql` | preferred_skills, seniority, closing_date, application_instructions, role_family_reason on jobs; `mark_job_applied()` RPC (atomic status change + applications row) |
+
+Apply them in the Supabase SQL editor (run each file in order) or with `supabase db push` if you use the CLI. Notes:
+
+- `status_history` has **no insert policy**: the security-definer trigger is the only writer, so the audit trail cannot be forged from the client.
+- A document that was ever approved can never be altered or deleted; superseding it is the only permitted change, and superseded rows are locked completely. This is what keeps sent documents immutable.
+- Interpretation notes: the spec's Prompt 5 extraction returns preferred skills, seniority, closing date, application instructions and a role-family reason, so those columns were added in `0005` rather than squeezing them into `notes`; `applications` is one row per job (`unique(job_id)`); `applications.created_at` added for consistency.
+
+## Testing
+
+- `supabase/tests/rls_isolation_test.sql` — run the whole file in the Supabase SQL editor; rolls back, leaves no data. Confirms another user and the anonymous role see zero of your rows.
+- `supabase/tests/rls-test.mjs` — end-to-end through the real Auth/REST/Storage APIs. Creates two throwaway users (turn **Confirm email** off on a test project first, or pass `RLS_TOKEN_A`/`RLS_TOKEN_B`):
+
+  ```bash
+  node supabase/tests/rls-test.mjs https://<project>.supabase.co <anon-key>
+  ```
+
+  It checks row isolation for jobs, career entries and status history, PATCH/DELETE rejection cross-user, the anon role seeing nothing, and Storage: no reading another user's documents, no writing into another user's folder.
 
 ## PWA
 
