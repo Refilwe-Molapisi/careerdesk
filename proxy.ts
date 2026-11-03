@@ -6,7 +6,7 @@ import { updateSession } from "@/lib/data/supabase/proxy";
  * refreshes the Supabase session and enforces login for all private pages.
  * Static assets are excluded via the matcher below.
  */
-const PUBLIC_PATHS = new Set(["/login", "/auth/callback"]);
+const PUBLIC_PATHS = new Set(["/login", "/auth/callback", "/offline"]);
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

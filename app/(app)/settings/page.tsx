@@ -3,6 +3,7 @@ import { Settings as SettingsIcon } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { requireUser } from "@/lib/data/auth";
 import { APP_NAME, APP_VERSION } from "@/lib/config";
+import { InstallAppCard } from "./install-app-card";
 import { SignOutCard } from "./sign-out-card";
 
 export const metadata: Metadata = {
@@ -57,6 +58,8 @@ export default async function SettingsPage() {
             </div>
           </dl>
         </section>
+
+        <InstallAppCard />
 
         <SignOutCard />
       </div>
