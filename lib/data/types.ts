@@ -81,3 +81,159 @@ export const CAREER_ENTRY_TYPE_FORM_LABELS: Record<CareerEntryType, string> = {
   certification: "Certification",
   other: "Other",
 };
+
+// ---------------------------------------------------------------------------
+// Jobs
+// ---------------------------------------------------------------------------
+
+export type JobStatus =
+  | "saved"
+  | "tailoring"
+  | "ready"
+  | "applied"
+  | "interviewing"
+  | "offer"
+  | "rejected"
+  | "withdrawn"
+  | "closed";
+
+/** Board column order. */
+export const JOB_STATUSES: JobStatus[] = [
+  "saved",
+  "tailoring",
+  "ready",
+  "applied",
+  "interviewing",
+  "offer",
+  "rejected",
+  "withdrawn",
+  "closed",
+];
+
+export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
+  saved: "Saved",
+  tailoring: "Tailoring",
+  ready: "Ready",
+  applied: "Applied",
+  interviewing: "Interviewing",
+  offer: "Offer",
+  rejected: "Rejected",
+  withdrawn: "Withdrawn",
+  closed: "Closed",
+};
+
+export type RoleFamily =
+  | "bi_reporting"
+  | "commercial_analysis"
+  | "market_research"
+  | "risk_fraud"
+  | "operations_analysis"
+  | "administration"
+  | "other";
+
+export const ROLE_FAMILIES: RoleFamily[] = [
+  "bi_reporting",
+  "commercial_analysis",
+  "market_research",
+  "risk_fraud",
+  "operations_analysis",
+  "administration",
+  "other",
+];
+
+/** The first five families are the candidate's targets; the rest are off-target. */
+export const TARGET_ROLE_FAMILIES: RoleFamily[] = [
+  "bi_reporting",
+  "commercial_analysis",
+  "market_research",
+  "risk_fraud",
+  "operations_analysis",
+];
+
+export const ROLE_FAMILY_LABELS: Record<RoleFamily, string> = {
+  bi_reporting: "BI and reporting",
+  commercial_analysis: "Commercial analysis",
+  market_research: "Market research",
+  risk_fraud: "Risk and fraud",
+  operations_analysis: "Operations analysis",
+  administration: "Administration",
+  other: "Other",
+};
+
+export type WorkMode = "remote" | "hybrid" | "onsite" | "unknown";
+
+export const WORK_MODES: WorkMode[] = ["remote", "hybrid", "onsite", "unknown"];
+
+export const WORK_MODE_LABELS: Record<WorkMode, string> = {
+  remote: "Remote",
+  hybrid: "Hybrid",
+  onsite: "On-site",
+  unknown: "Unknown",
+};
+
+export type Job = {
+  id: string;
+  user_id: string;
+  title: string | null;
+  company: string | null;
+  location: string | null;
+  work_mode: WorkMode | null;
+  source_url: string | null;
+  description: string | null;
+  required_skills: string[];
+  preferred_skills: string[];
+  role_family: RoleFamily;
+  role_family_reason: string | null;
+  seniority: string | null;
+  closing_date: string | null;
+  application_instructions: string | null;
+  date_found: string;
+  status: JobStatus;
+  status_updated_at: string;
+  follow_up_date: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
+export type JobInput = {
+  user_id: string;
+  title: string | null;
+  company: string | null;
+  location: string | null;
+  work_mode: WorkMode | null;
+  source_url: string | null;
+  description: string | null;
+  required_skills: string[];
+  preferred_skills: string[];
+  role_family: RoleFamily;
+  role_family_reason: string | null;
+  seniority: string | null;
+  closing_date: string | null;
+  application_instructions: string | null;
+};
+
+export type StatusHistoryEntry = {
+  id: string;
+  user_id: string;
+  job_id: string;
+  from_status: JobStatus | null;
+  to_status: JobStatus;
+  changed_at: string;
+};
+
+export type Application = {
+  id: string;
+  user_id: string;
+  job_id: string;
+  submitted_cv_id: string | null;
+  submitted_cover_letter_id: string | null;
+  submitted_cv_pdf_path: string | null;
+  submitted_cv_sha256: string | null;
+  submitted_cover_letter_pdf_path: string | null;
+  submitted_cover_letter_sha256: string | null;
+  applied_on: string;
+  applied_manually: boolean;
+  next_action: string | null;
+  next_action_date: string | null;
+  created_at: string;
+};
