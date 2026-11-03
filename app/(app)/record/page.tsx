@@ -1,27 +1,31 @@
 import type { Metadata } from "next";
-import { NotebookText } from "lucide-react";
-import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { requireUser } from "@/lib/data/auth";
+import {
+  listCareerEntries,
+  listVoiceSamples,
+} from "@/lib/data/queries/career";
+import { RecordView } from "@/components/record/record-view";
 
 export const metadata: Metadata = {
   title: "Career Record",
 };
 
 export default async function CareerRecordPage() {
-  await requireUser();
+  const { user, supabase } = await requireUser();
+
+  const [entries, voiceSamples] = await Promise.all([
+    listCareerEntries(supabase),
+    listVoiceSamples(supabase),
+  ]);
 
   return (
     <>
       <PageHeader
         title="Career Record"
-        description="Your single source of truth. Every CV line the AI writes must come from here."
+        description="Your single source of truth: every CV line the AI writes must come from here, backed by evidence."
       />
-      <EmptyState
-        icon={NotebookText}
-        title="Your record is empty"
-        description="Education, jobs, projects, skills, achievements and certifications will live here, each backed by evidence you can show."
-      />
+      <RecordView userId={user.id} entries={entries} voiceSamples={voiceSamples} />
     </>
   );
 }

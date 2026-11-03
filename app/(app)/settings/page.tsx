@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { Settings as SettingsIcon } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { requireUser } from "@/lib/data/auth";
-import { APP_NAME, APP_VERSION } from "@/lib/config";
+import { getUserSettings } from "@/lib/data/queries/career";
+import { APP_NAME, APP_VERSION, DEFAULT_BANNED_PHRASES } from "@/lib/config";
+import { BannedPhrasesCard } from "./banned-phrases-card";
 import { InstallAppCard } from "./install-app-card";
 import { SignOutCard } from "./sign-out-card";
 
@@ -11,7 +12,17 @@ export const metadata: Metadata = {
 };
 
 export default async function SettingsPage() {
-  const { user } = await requireUser();
+  const { user, supabase } = await requireUser();
+
+  let bannedPhrases: string[] = [...DEFAULT_BANNED_PHRASES];
+  try {
+    const settings = await getUserSettings(supabase, user.id);
+    if (settings?.banned_phrases) {
+      bannedPhrases = settings.banned_phrases;
+    }
+  } catch {
+    // Table may not exist yet (migration not run): fall back to defaults.
+  }
 
   return (
     <>
@@ -21,6 +32,8 @@ export default async function SettingsPage() {
       />
 
       <div className="space-y-4">
+        <BannedPhrasesCard userId={user.id} initialPhrases={bannedPhrases} />
+
         <section className="card p-5">
           <h2 className="mb-4 text-base font-semibold text-stone-900">
             Account

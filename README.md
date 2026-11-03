@@ -31,6 +31,7 @@ Operations must keep working when the AI is unavailable: AI features show a clea
 - [x] **Prompt 1** — Scaffold, app identity (`lib/config.ts`), Supabase email auth (password + magic link) with route protection, app shell (desktop sidebar, mobile bottom tabs) with Dashboard, Jobs, Applications, Career Record, Skills, Plan, Settings. 404 page, error boundary, loading, empty states.
 - [x] **Prompt 2** — PWA: manifest, icons, service worker, offline page, install prompt.
 - [x] **Prompt 3** — Database: SQL migrations, RLS on every table, status history and approved-document triggers, private `documents` storage bucket. **Verified against a local Postgres with Supabase-shaped stubs: 18/18 tests pass** (trigger timing, RLS isolation between two users, approved-document immutability, storage folder isolation, constraints).
+- [x] **Prompt 4** — Career Record: grouped list with search and tag filters, add/edit form with two-step missing-evidence warning, CV import through DeepSeek with an accept/edit/discard review (nothing saves automatically), voice samples, banned-phrase list in Settings. **AI layer verified against a fake OpenAI-compatible server: 6/6 tests pass** (JSON parsing, fenced output, malformed-proposal recovery, retry and error mapping).
 - [ ] **Prompt 4** — Career Record page, CV import with review, voice samples, banned phrases.
 - [ ] **Prompt 5** — Job intake with AI extraction, jobs board (kanban + table), status history, Dashboard.
 
