@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import {
   CareerEntryForm,
-  emptyEntryValues,
   type CareerEntryFormValues,
 } from "./career-entry-form";
 import type { CareerEntryInput } from "@/lib/data/types";

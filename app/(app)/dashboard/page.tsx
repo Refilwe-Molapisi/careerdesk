@@ -58,7 +58,6 @@ export default async function DashboardPage() {
   const followUps = jobs
     .filter((j) => j.follow_up_date !== null && j.follow_up_date <= weekIso)
     .sort((a, b) => (a.follow_up_date ?? "").localeCompare(b.follow_up_date ?? ""));
-  const overdue = followUps.filter((j) => (j.follow_up_date ?? "") < todayIso);
 
   const stale = jobs.filter(
     (j) =>

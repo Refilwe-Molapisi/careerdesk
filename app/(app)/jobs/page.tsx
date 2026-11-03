@@ -14,7 +14,7 @@ export default async function JobsPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  const { user, supabase } = await requireUser();
+  const { supabase } = await requireUser();
   const [{ status }, jobs] = await Promise.all([searchParams, listJobs(supabase)]);
 
   return (

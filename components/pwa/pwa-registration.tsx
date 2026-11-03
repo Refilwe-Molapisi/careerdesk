@@ -1,25 +1,16 @@
 "use client";
 
 import { useEffect } from "react";
+import {
+  captureInstallPrompt,
+  markInstalled,
+} from "@/components/pwa/install-prompt-store";
 
 /**
  * Registers the service worker in production builds and captures the
- * browser install prompt so Settings can offer "Install Career Desk".
+ * browser install prompt into the shared install-prompt store so Settings
+ * can offer "Install Career Desk".
  */
-
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-};
-
-declare global {
-  interface Window {
-    __careerDeskInstallPrompt?: BeforeInstallPromptEvent | null;
-  }
-}
-
-export const INSTALL_PROMPT_EVENT = "careerdesk:install-available";
-
 export function PwaRegistration() {
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") return;
@@ -34,15 +25,12 @@ export function PwaRegistration() {
     if (document.readyState === "complete") register();
     else window.addEventListener("load", register, { once: true });
 
-    const captureInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      window.__careerDeskInstallPrompt = event as BeforeInstallPromptEvent;
-      window.dispatchEvent(new Event(INSTALL_PROMPT_EVENT));
-    };
     window.addEventListener("beforeinstallprompt", captureInstallPrompt);
+    window.addEventListener("appinstalled", markInstalled);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", captureInstallPrompt);
+      window.removeEventListener("appinstalled", markInstalled);
       window.removeEventListener("load", register);
     };
   }, []);

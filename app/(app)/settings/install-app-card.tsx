@@ -1,49 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { MonitorSmartphone } from "lucide-react";
 import { toast } from "sonner";
-import { INSTALL_PROMPT_EVENT } from "@/components/pwa/pwa-registration";
+import {
+  getPromptEvent,
+  useInstallState,
+} from "@/components/pwa/install-prompt-store";
 
 export function InstallAppCard() {
-  const [canInstall, setCanInstall] = useState(false);
-  const [installed, setInstalled] = useState(false);
-
-  useEffect(() => {
-    const standalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      window.matchMedia("(display-mode: fullscreen)").matches ||
-      // iOS Safari
-      (window.navigator as Navigator & { standalone?: boolean }).standalone ===
-        true;
-    setInstalled(Boolean(standalone));
-    setCanInstall(Boolean(window.__careerDeskInstallPrompt));
-
-    const onPromptAvailable = () => setCanInstall(true);
-    const onInstalled = () => {
-      setInstalled(true);
-      setCanInstall(false);
-      window.__careerDeskInstallPrompt = null;
-      toast.success("Career Desk was installed.");
-    };
-    window.addEventListener(INSTALL_PROMPT_EVENT, onPromptAvailable);
-    window.addEventListener("appinstalled", onInstalled);
-    return () => {
-      window.removeEventListener(INSTALL_PROMPT_EVENT, onPromptAvailable);
-      window.removeEventListener("appinstalled", onInstalled);
-    };
-  }, []);
+  const { canInstall, installed } = useInstallState();
 
   async function install() {
-    const event = window.__careerDeskInstallPrompt;
+    const event = getPromptEvent();
     if (!event) return;
     await event.prompt();
     const choice = await event.userChoice;
     if (choice.outcome === "accepted") {
-      setInstalled(true);
+      toast.success("Career Desk was installed.");
     }
-    window.__careerDeskInstallPrompt = null;
-    setCanInstall(false);
   }
 
   return (

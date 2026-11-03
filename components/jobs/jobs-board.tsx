@@ -42,8 +42,14 @@ export function JobsBoard({ jobs, initialStatusFilter }: JobsBoardProps) {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(VIEW_STORAGE_KEY);
-    if (saved === "table" || saved === "board") setView(saved);
+    // Restore the saved view after hydration; a lazy useState initializer
+    // would read window during SSR and a synchronous read here would fight
+    // the hydration pass.
+    const raf = requestAnimationFrame(() => {
+      const saved = window.localStorage.getItem(VIEW_STORAGE_KEY);
+      if (saved === "table" || saved === "board") setView(saved);
+    });
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   function switchView(next: ViewMode) {
@@ -327,7 +333,7 @@ function KanbanBoard({
   const dragOffset = useRef({ x: 0, y: 0 });
   const startPoint = useRef<{ x: number; y: number } | null>(null);
 
-  function beginDrag(e: React.PointerEvent, job: Job) {
+  function beginDrag(e: React.PointerEvent) {
     if (busyId) return;
     startPoint.current = { x: e.clientX, y: e.clientY };
     dragOffset.current = { x: e.clientX, y: e.clientY };
@@ -410,7 +416,7 @@ function KanbanBoard({
                       <JobCard
                         job={job}
                         busy={busyId === job.id}
-                        onDragStart={(e) => beginDrag(e, job)}
+                        onDragStart={beginDrag}
                         onDragMove={(e) => moveDrag(e, job)}
                         onDragEnd={(e) => endDrag(e, job)}
                         onStatusChange={(s) => onStatusChange(job, s)}
