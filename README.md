@@ -1,0 +1,74 @@
+# Career Desk
+
+A private, single-user web app (PWA) for one job seeker based in South Africa who applies for remote jobs worldwide. It tracks the career plan, finds and checks jobs, tailors CVs from verified evidence, builds and assesses skills, and coaches interviews.
+
+Built prompt by prompt from the Career Desk Master Specification. This README is updated as each prompt lands.
+
+## Stack
+
+- **Front end:** Next.js 16 (App Router, TypeScript), Tailwind CSS v4, installable PWA
+- **Database and auth:** Supabase (Postgres, Auth, Storage, Row Level Security)
+- **Text AI:** DeepSeek through server routes (OpenAI-compatible API)
+- **Email:** Resend (added in a later prompt)
+- **Hosting:** Vercel
+
+## Code layout (three layers, one-directional imports)
+
+```
+operations -> intelligence -> data
+```
+
+| Layer | Location | Job |
+| --- | --- | --- |
+| Data | `lib/data/` | Supabase clients, typed queries, migrations, storage. No AI calls. |
+| Intelligence | `lib/intelligence/` | AI prompts, tasks, validators. Plain data in, validated results out. No UI. |
+| Operations | `app/`, `lib/operations/` | Pages, actions, reminders, documents. Calls the other two layers, never DeepSeek directly. |
+
+Operations must keep working when the AI is unavailable: AI features show a clear unavailable state and never block the page.
+
+## Build status
+
+- [x] **Prompt 1** — Scaffold, app identity (`lib/config.ts`), Supabase email auth (password + magic link) with route protection, app shell (desktop sidebar, mobile bottom tabs) with Dashboard, Jobs, Applications, Career Record, Skills, Plan, Settings. 404 page, error boundary, loading, empty states.
+- [ ] **Prompt 2** — PWA: manifest, icons, service worker, offline page, install prompt.
+- [ ] **Prompt 3** — Database: SQL migrations, RLS on every table, status history and approved-document triggers, private `documents` storage bucket.
+- [ ] **Prompt 4** — Career Record page, CV import with review, voice samples, banned phrases.
+- [ ] **Prompt 5** — Job intake with AI extraction, jobs board (kanban + table), status history, Dashboard.
+
+## Local setup
+
+1. **Create the Supabase project** at [supabase.com](https://supabase.com). Copy the Project URL and anon key from Project Settings → API.
+2. **Environment variables:**
+
+   ```bash
+   cp .env.example .env.local
+   # fill in NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
+   ```
+
+3. **Install and run:**
+
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+4. **Create your account:** open http://localhost:3000, use *Create account* with your email and a password (or request a magic link). If Supabase has email confirmation enabled, confirm via the email first. Once your account exists, disable new sign-ups: Supabase Dashboard → Authentication → Sign In / Up → turn off **Allow new users to sign up**.
+
+5. **Supabase auth URLs** (needed for magic links): Project Settings → Auth → set **Site URL** to `http://localhost:3000` and add `http://localhost:3000/auth/callback` to **Redirect URLs**.
+
+## Security model
+
+- Every table has Row Level Security with `user_id = auth.uid()` policies (added in Prompt 3).
+- The proxy (`proxy.ts`, Next 16's middleware) refreshes sessions and blocks unauthenticated access to every route except `/login` and `/auth/callback`; pages re-check with `requireUser()`.
+- AI keys are server-side only (`DEEPSEEK_API_KEY` never reaches the browser).
+- The service worker never caches authenticated API responses or anything from Supabase (added in Prompt 2).
+- No analytics, no third-party trackers.
+
+## Deploying to Vercel
+
+1. Push this repository to GitHub.
+2. In Vercel: **Add New Project** → import the repo (framework auto-detects as Next.js).
+3. Add environment variables from `.env.example` (Production and Preview).
+4. In Supabase: set **Site URL** to your production URL and add `https://<your-app>.vercel.app/auth/callback` to **Redirect URLs**.
+5. Deploy, then sign in once and disable new sign-ups in Supabase if you have not already.
+
+Later prompts extend this section (Resend sender domain, Vercel Cron, backups).
