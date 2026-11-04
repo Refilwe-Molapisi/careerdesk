@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { CalendarClock, GripVertical, LayoutGrid, Table2 } from "lucide-react";
 import { createClient } from "@/lib/data/supabase/browser";
 import { updateJob } from "@/lib/data/queries/jobs";
+import { EligibilityBadge } from "@/components/jobs/eligibility";
 import {
   JOB_STATUSES,
   JOB_STATUS_LABELS,
@@ -39,6 +40,7 @@ export function JobsBoard({ jobs, initialStatusFilter }: JobsBoardProps) {
   const [foundFrom, setFoundFrom] = useState("");
   const [foundTo, setFoundTo] = useState("");
   const [followUpFilter, setFollowUpFilter] = useState<FollowUpFilter>("any");
+  const [eligibilityFilter, setEligibilityFilter] = useState<string>("");
   const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -76,6 +78,8 @@ export function JobsBoard({ jobs, initialStatusFilter }: JobsBoardProps) {
         return false;
       if (foundFrom && job.date_found < foundFrom) return false;
       if (foundTo && job.date_found > foundTo) return false;
+      if (eligibilityFilter && job.eligibility_status !== eligibilityFilter)
+        return false;
       if (followUpFilter !== "any") {
         if (!job.follow_up_date) return false;
         if (followUpFilter === "overdue" && job.follow_up_date >= todayIso)
@@ -88,7 +92,7 @@ export function JobsBoard({ jobs, initialStatusFilter }: JobsBoardProps) {
       }
       return true;
     });
-  }, [jobs, statusFilter, companyFilter, foundFrom, foundTo, followUpFilter]);
+  }, [jobs, statusFilter, companyFilter, foundFrom, foundTo, followUpFilter, eligibilityFilter]);
 
   async function changeStatus(job: Job, status: JobStatus) {
     if (job.status === status) return;
@@ -124,7 +128,8 @@ export function JobsBoard({ jobs, initialStatusFilter }: JobsBoardProps) {
     companyFilter !== "" ||
     foundFrom !== "" ||
     foundTo !== "" ||
-    followUpFilter !== "any";
+    followUpFilter !== "any" ||
+    eligibilityFilter !== "";
 
   if (jobs.length === 0) {
     return (
@@ -208,6 +213,21 @@ export function JobsBoard({ jobs, initialStatusFilter }: JobsBoardProps) {
                   {JOB_STATUS_LABELS[s]}
                 </option>
               ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="f-elig" className="label">Eligibility</label>
+            <select
+              id="f-elig"
+              value={eligibilityFilter}
+              onChange={(e) => setEligibilityFilter(e.target.value)}
+              className="input"
+            >
+              <option value="">Any</option>
+              <option value="eligible">Eligible</option>
+              <option value="potentially_eligible">Potentially eligible</option>
+              <option value="ineligible">Ineligible</option>
+              <option value="unverified">Unverified</option>
             </select>
           </div>
           <div>
@@ -560,6 +580,8 @@ function JobsTable({
             <th className="px-4 py-3 font-medium">Role</th>
             <th className="px-4 py-3 font-medium">Status</th>
             <th className="px-4 py-3 font-medium">Family</th>
+            <th className="px-4 py-3 font-medium">Eligibility</th>
+            <th className="px-4 py-3 font-medium">Salary</th>
             <th className="px-4 py-3 font-medium">Found</th>
             <th className="px-4 py-3 font-medium">Follow-up</th>
             <th className="px-4 py-3 font-medium">Updated</th>
@@ -584,6 +606,16 @@ function JobsTable({
                     {job.company ?? "Unknown company"}
                     {offTarget ? " · off-target" : ""}
                   </p>
+                </td>
+                <td className="px-4 py-3">
+                  <EligibilityBadge status={job.eligibility_status} />
+                </td>
+                <td className="px-4 py-3 text-xs text-stone-500">
+                  {job.salary_currency
+                    ? [job.salary_min ?? "?", job.salary_max ?? job.salary_min ?? "?"]
+                        .filter((v, i, a) => a.indexOf(v) === i)
+                        .join(" - ") + ` ${job.salary_currency}`
+                    : "-"}
                 </td>
                 <td className="px-4 py-3">
                   <label className="sr-only" htmlFor={`t-status-${job.id}`}>

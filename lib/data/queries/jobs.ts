@@ -56,6 +56,23 @@ export async function updateJob(
       | "follow_up_date"
       | "notes"
       | "role_family"
+      | "employer_country"
+      | "eligible_countries"
+      | "employment_type"
+      | "engagement_model"
+      | "timezone"
+      | "required_overlap_hours"
+      | "salary_currency"
+      | "salary_min"
+      | "salary_max"
+      | "eligibility_status"
+      | "eligibility_evidence"
+      | "eligibility_checked_at"
+      | "recommendation"
+      | "recommendation_factors"
+      | "recommendation_note"
+      | "recommendation_overridden"
+      | "override_reason"
     >
   >,
 ): Promise<Job> {

@@ -8,6 +8,12 @@ import { CheckCircle2, CalendarClock, FileText } from "lucide-react";
 import { createClient } from "@/lib/data/supabase/browser";
 import { markJobApplied, updateJob } from "@/lib/data/queries/jobs";
 import {
+  ELIGIBILITY_DISCLAIMER,
+  EligibilityBadge,
+  EmployerChecklist,
+  RunEligibilityButton,
+} from "@/components/jobs/eligibility";
+import {
   JOB_STATUSES,
   JOB_STATUS_LABELS,
   ROLE_FAMILY_LABELS,
@@ -123,6 +129,7 @@ export function JobDetailClient({
               {job.closing_date ? (
                 <span className="chip">closes {job.closing_date}</span>
               ) : null}
+              <EligibilityBadge status={job.eligibility_status} />
             </div>
           </div>
           <div className="w-full sm:w-44">
@@ -279,16 +286,43 @@ export function JobDetailClient({
             CV and cover letter versions
           </h3>
           {job.description && job.description.trim().length >= 50 ? (
-            <Link
-              href={`/jobs/${job.id}/tailor`}
-              className="btn-outline !border-accent/40 !text-accent hover:!bg-accent-soft"
-            >
-              {documents.some((d) => d.status === "draft")
-                ? "Continue tailoring"
-                : "Tailor my application"}
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <RunEligibilityButton jobId={job.id} />
+              {job.eligibility_status === "ineligible" ? (
+                <span className="text-xs text-red-600">
+                  Ineligible: tailor anyway only with a reason.
+                </span>
+              ) : null}
+              <Link
+                href={`/jobs/${job.id}/tailor`}
+                className="btn-outline !border-accent/40 !text-accent hover:!bg-accent-soft"
+              >
+                {documents.some((d) => d.status === "draft")
+                  ? "Continue tailoring"
+                  : job.eligibility_status === "ineligible"
+                    ? "Tailor anyway"
+                    : "Tailor my application"}
+              </Link>
+            </div>
           ) : null}
         </div>
+        {job.eligibility_evidence.length > 0 ? (
+          <div className="mt-3 rounded-lg border border-stone-100 bg-stone-50 px-3 py-2.5">
+            <p className="text-xs font-semibold text-stone-700">
+              Eligibility evidence from the posting
+            </p>
+            <ul className="mt-1.5 space-y-1.5">
+              {job.eligibility_evidence.map((item, i) => (
+                <li key={i} className="text-xs leading-relaxed text-stone-600">
+                  <span className="italic">&ldquo;{item.quote}&rdquo;</span>
+                  {item.note ? <span className="text-stone-400"> — {item.note}</span> : null}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[11px] text-stone-400">{ELIGIBILITY_DISCLAIMER}</p>
+          </div>
+        ) : null}
+        <EmployerChecklist job={job} />
         {documents.length === 0 ? (
           <p className="mt-2 text-xs leading-relaxed text-stone-400">
             None yet. Tailoring drafts a CV and cover letter from your Career

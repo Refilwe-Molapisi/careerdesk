@@ -196,6 +196,29 @@ export type Job = {
   follow_up_date: string | null;
   notes: string | null;
   created_at: string;
+  employer_country: string | null;
+  eligible_countries: string[];
+  candidate_location_eligible: boolean | null;
+  employment_type: "permanent" | "fixed_term" | "contract" | "unknown" | null;
+  engagement_model: "local_employment" | "eor" | "contractor" | "unknown" | null;
+  timezone: string | null;
+  required_overlap_hours: string | null;
+  salary_currency: string | null;
+  salary_min: number | null;
+  salary_max: number | null;
+  eligibility_status: "eligible" | "potentially_eligible" | "ineligible" | "unverified";
+  eligibility_evidence: { quote: string; source_url?: string; note?: string }[];
+  eligibility_checked_at: string | null;
+  recommendation:
+    | "apply"
+    | "apply_with_reservations"
+    | "develop_first"
+    | "do_not_apply"
+    | null;
+  recommendation_factors: unknown;
+  recommendation_note: string | null;
+  recommendation_overridden: boolean;
+  override_reason: string | null;
 };
 
 export type JobInput = {

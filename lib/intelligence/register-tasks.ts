@@ -17,6 +17,7 @@ import { runDraftCoverLetter } from "@/lib/intelligence/tasks/draft-cover-letter
 import { runClaimCheck } from "@/lib/intelligence/tasks/claim-check";
 import { runReviseLines } from "@/lib/intelligence/tasks/revise";
 import { runSkillAssessment } from "@/lib/intelligence/tasks/skill-assessment";
+import "@/lib/intelligence/tasks/eligibility";
 import type { EntryText } from "@/lib/intelligence/validate";
 
 /**
