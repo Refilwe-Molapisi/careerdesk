@@ -34,7 +34,7 @@ export async function POST() {
     );
   }
 
-  const data = await collectReminderData(supabase, user.id);
+  const data = await collectReminderData(supabase);
   const { subject, html } = buildReminderEmail(data);
 
   try {

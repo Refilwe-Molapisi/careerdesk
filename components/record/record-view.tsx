@@ -323,6 +323,7 @@ export function RecordView({ userId, entries, voiceSamples }: RecordViewProps) {
 
 export function toFormValues(entry: CareerEntry): CareerEntryFormValues {
   return {
+    id: entry.id,
     type: entry.type,
     title: entry.title,
     organisation: entry.organisation ?? "",

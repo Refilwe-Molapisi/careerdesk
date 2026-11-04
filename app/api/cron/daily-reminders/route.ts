@@ -48,7 +48,7 @@ export async function GET(request: Request) {
 
   for (const { userId, email } of users) {
     try {
-      const data = await collectReminderData(service, userId);
+      const data = await collectReminderData(service);
       if (!hasAnything(data)) {
         results.push({ userId, status: "skipped_empty" });
         continue;

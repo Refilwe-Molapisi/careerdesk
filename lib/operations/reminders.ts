@@ -30,7 +30,6 @@ function toDateIso(d: Date): string {
 
 export async function collectReminderData(
   client: SupabaseClient,
-  userId: string,
 ): Promise<ReminderData> {
   const today = new Date();
   const todayIso = toDateIso(today);

@@ -52,6 +52,13 @@ import {
   splicePart,
 } from "@/lib/operations/document-parts";
 import { rateLimit } from "@/lib/operations/rate-limit";
+import {
+  checkGeneratedText,
+  checkSkillLevelClaims,
+  checkSummaryLength,
+} from "@/lib/operations/quality";
+import { listSkills } from "@/lib/data/queries/skills";
+import { LEVEL_ORDER as PROFICIENCY_ORDER } from "@/lib/intelligence/tasks/skill-assessment";
 
 /**
  * POST /api/jobs/[id]/tailor  -  the tailoring pipeline (Prompt 6).
@@ -79,7 +86,17 @@ type Body = {
   instruction?: unknown;
   part?: unknown;
   content_json?: unknown;
+  reason_tag?: unknown;
 };
+
+const REASON_TAGS = [
+  "inaccurate",
+  "too_strong",
+  "wrong_tone",
+  "irrelevant",
+  "missing_detail",
+  "other",
+];
 
 export async function POST(
   request: Request,
@@ -383,7 +400,47 @@ export async function POST(
         },
       });
 
-      return NextResponse.json({ document: newDocument, violations });
+      // Correction log (Prompt 22): lines the user changed against the
+      // previous version, with a reason tag.
+      const reasonTag =
+        typeof (body as { reason_tag?: unknown }).reason_tag === "string" &&
+        REASON_TAGS.includes((body as { reason_tag?: string }).reason_tag!)
+          ? (body as { reason_tag: string }).reason_tag
+          : "other";
+      const previousTexts = new Set(
+        documentLines(document.kind, document.content_json).map((l) => l.text),
+      );
+      const currentTexts = new Set(
+        documentLines(document.kind, parsedContent.data).map((l) => l.text),
+      );
+      const edits = documentLines(document.kind, parsedContent.data).filter(
+        (l) => !previousTexts.has(l.text),
+      );
+      const originals = documentLines(document.kind, document.content_json);
+      await Promise.all(
+        edits.slice(0, 40).map((line, i) => {
+          const original =
+            originals.find(
+              (o) =>
+                !currentTexts.has(o.text) &&
+                o.entry_ids.join() === line.entry_ids.join(),
+            ) ?? originals[i];
+          if (!original || original.text === line.text) return Promise.resolve();
+          return supabase.from("corrections").insert({
+            user_id: user.id,
+            document_id: newDocument.id,
+            original_text: original.text,
+            edited_text: line.text,
+            reason_tag: reasonTag,
+          });
+        }),
+      );
+
+      return NextResponse.json({
+        document: newDocument,
+        violations,
+        corrections_logged: edits.length,
+      });
     }
 
     if (body.step === "approve") {
@@ -525,6 +582,42 @@ async function fullChecks(
 ): Promise<Violation[]> {
   const lines: DraftLine[] = documentLines(kind, contentJson);
   const { violations } = validateDraft(lines, entriesById, allowed);
+  if (violations.length > 0) return violations;
+
+  // Prompt 22 deterministic rules, on top of the source checks.
+  const skills = await listSkills(supabase);
+  const skillLevels = new Map(
+    skills.map((s) => [s.name.toLowerCase(), PROFICIENCY_ORDER[s.proficiency] ?? 3]),
+  );
+  for (const line of lines) {
+    for (const bad of checkGeneratedText(line.text)) {
+      violations.push({
+        text: line.text,
+        entry_ids: line.entry_ids,
+        reason: "ai_flagged",
+        detail: bad.detail,
+      });
+    }
+    for (const bad of checkSkillLevelClaims(line.text, skillLevels)) {
+      violations.push({
+        text: line.text,
+        entry_ids: line.entry_ids,
+        reason: "ai_flagged",
+        detail: bad.detail,
+      });
+    }
+  }
+  if (kind === "cv") {
+    const summary = (contentJson as CvDraft).summary?.text ?? "";
+    for (const bad of checkSummaryLength(summary)) {
+      violations.push({
+        text: "(summary)",
+        entry_ids: [],
+        reason: "too_long",
+        detail: bad.detail,
+      });
+    }
+  }
   if (violations.length > 0) return violations;
 
   violations.push(

@@ -129,7 +129,7 @@ export async function fetchPublicPage(url: string): Promise<string> {
  * Web search is only wired when a search API key is configured; without one
  * it fails loudly instead of pretending to search.
  */
-export async function searchWeb(_query: string): Promise<string> {
+export async function searchWeb(): Promise<string> {
   throw new Error(
     "No search API key is configured, so web search is unavailable. Paste the source text instead.",
   );

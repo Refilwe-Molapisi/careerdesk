@@ -3,6 +3,7 @@ import {
   CalendarCheck,
   FileCheck2,
   FileText,
+  FlaskConical,
   GraduationCap,
   LayoutDashboard,
   NotebookText,
@@ -24,5 +25,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/record", label: "Career Record", icon: NotebookText },
   { href: "/skills", label: "Skills", icon: GraduationCap },
   { href: "/plan", label: "Plan", icon: CalendarCheck },
+  { href: "/evaluations", label: "Evaluations", icon: FlaskConical },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

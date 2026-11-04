@@ -8,7 +8,15 @@ import {
   type CareerEntryType,
 } from "@/lib/data/types";
 
+type Contradiction = {
+  type: string;
+  detail: string;
+  entryA: { id: string; title: string; organisation: string | null };
+  entryB: { id: string; title: string; organisation: string | null };
+};
+
 export type CareerEntryFormValues = {
+  id?: string;
   type: CareerEntryType;
   title: string;
   organisation: string;
@@ -60,6 +68,8 @@ export function CareerEntryForm({
   const [tagDraft, setTagDraft] = useState("");
   const [evidenceConfirmed, setEvidenceConfirmed] = useState(false);
   const [dateError, setDateError] = useState<string | null>(null);
+  const [contradictions, setContradictions] = useState<Contradiction[]>([]);
+  const [contradictionsConfirmed, setContradictionsConfirmed] = useState(false);
 
   function set<K extends keyof CareerEntryFormValues>(
     key: K,
@@ -88,7 +98,7 @@ export function CareerEntryForm({
     }
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     if (!values.title.trim()) return;
@@ -106,6 +116,35 @@ export function CareerEntryForm({
       return;
     }
 
+    // Contradiction check (Prompt 22): advisory, two-step like the evidence
+    // guard. Saving is never blocked.
+    if (!contradictionsConfirmed) {
+      try {
+        const res = await fetch("/api/record/contradictions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: initialValues.id ?? undefined,
+            title: values.title,
+            organisation: values.organisation,
+            type: values.type,
+            start_date: values.start_date || null,
+            end_date: values.currently ? null : values.end_date || null,
+            description: values.description,
+          }),
+        });
+        const payload = await res.json().catch(() => null);
+        const found = (payload?.contradictions ?? []) as Contradiction[];
+        if (found.length > 0) {
+          setContradictions(found);
+          setContradictionsConfirmed(true);
+          return;
+        }
+      } catch {
+        // The check is advisory; a failed check never blocks saving.
+      }
+    }
+
     onSubmit(values);
   }
 
@@ -113,6 +152,8 @@ export function CareerEntryForm({
     () => !values.evidence.trim() && evidenceConfirmed,
     [values.evidence, evidenceConfirmed],
   );
+
+  const contradictionWarning = contradictions.length > 0;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -234,6 +275,27 @@ export function CareerEntryForm({
           className="input"
           placeholder="A number, a link, a file, or a plain statement of what you can show."
         />
+        {contradictionWarning ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900">
+            <p className="font-semibold">
+              Possible contradictions in your record
+            </p>
+            <ul className="mt-1.5 space-y-1.5">
+              {contradictions.map((c, i) => (
+                <li key={i}>
+                  {c.detail}{" "}
+                  <span className="text-amber-700">
+                    [&ldquo;{c.entryA.title}&rdquo; vs &ldquo;{c.entryB.title}&rdquo;]
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1 text-amber-700">
+              Check the dates and figures; save anyway if they are correct.
+            </p>
+          </div>
+        ) : null}
+
         {evidenceWarning ? (
           <p className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -300,6 +362,8 @@ export function CareerEntryForm({
             ? "Saving..."
             : evidenceWarning
               ? "Save anyway (no evidence)"
+              : contradictions.length > 0 && !contradictionsConfirmed
+              ? "Save anyway"
               : saveLabel}
         </button>
       </div>

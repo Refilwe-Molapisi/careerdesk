@@ -128,6 +128,13 @@ export async function runTask<T = unknown>({
 
   const started = Date.now();
 
+  // The owner's confirmed rules join the core prompt (Prompt 22 item 6).
+  const { data: rules } = await supabase
+    .from("prompt_rules")
+    .select("rule_text")
+    .eq("active", true);
+  const userRules = (rules ?? []).map((r) => r.rule_text as string);
+
   if (def.legacy) {
     try {
       const result = (await def.legacy(input, { supabase, userId })) as T;
@@ -181,7 +188,15 @@ export async function runTask<T = unknown>({
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const result = await chatJson({
-        system: [CORE_PROMPT, ...def.modules, "", def.instruction].join("\n"),
+        system: [
+          CORE_PROMPT,
+          ...def.modules,
+          "",
+          def.instruction,
+          ...(userRules.length > 0
+            ? ["", "ADDITIONAL RULES FROM THE OWNER:", ...userRules.map((r) => `- ${r}`)]
+            : []),
+        ].join("\n"),
         user: def.buildUser(input),
         schema: def.schema,
         maxTokens: def.maxTokens,
