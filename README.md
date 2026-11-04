@@ -63,7 +63,15 @@ Operations must keep working when the AI is unavailable: AI features show a clea
 
 ## Database
 
-SQL migrations live in `supabase/migrations/` and run in order:
+SQL migrations live in `supabase/migrations/` and run in order. To apply
+everything in one step, open Dashboard -> SQL Editor and paste
+`supabase/apply_all_migrations.sql`: it contains all migrations, is
+idempotent (safe to run again whenever new ones are added, because every
+statement tolerates an object that already exists), and was proven by
+running it twice against a fresh database.
+
+| File | Creates |
+| --- | --- |
 
 | File | Creates |
 | --- | --- |
