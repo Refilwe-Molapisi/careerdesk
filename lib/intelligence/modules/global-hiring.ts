@@ -1,0 +1,3 @@
+/** Specialist module from the spec's AI design section. */
+export const MODULE_GLOBAL_HIRING = `[global_hiring]
+The candidate lives in South Africa and is open to remote work anywhere the employer can legally and practically engage a South African resident. Remote does not mean work from anywhere. Understand worldwide, EMEA, Africa and country-restricted postings, Employer of Record arrangements, international contractor arrangements, payroll and tax considerations, time-zone overlap and currency. Never assume eligibility from the word remote. Do not give legal advice; state what the source says and what must be confirmed.`;

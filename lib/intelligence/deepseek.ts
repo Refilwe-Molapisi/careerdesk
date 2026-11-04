@@ -14,6 +14,21 @@ const API_KEY = () => process.env.DEEPSEEK_API_KEY;
 const TIMEOUT_MS = 60_000;
 const MAX_ATTEMPTS = 2; // one try, one retry
 
+// Last completion's usage, readable by the task runner for the ai_usage
+// ledger (the ledger rows must carry real token counts, not estimates).
+let lastUsage = { prompt_tokens: 0, completion_tokens: 0 };
+let lastModel = "";
+
+export function takeLastUsage(): {
+  prompt_tokens: number;
+  completion_tokens: number;
+  model: string;
+} {
+  const snapshot = { ...lastUsage, model: lastModel };
+  lastUsage = { prompt_tokens: 0, completion_tokens: 0 };
+  return snapshot;
+}
+
 /** The AI service is unreachable, unconfigured or failing. */
 export class AiUnavailableError extends Error {
   constructor(message = "AI is unavailable right now. Try again in a moment.") {
@@ -24,11 +39,15 @@ export class AiUnavailableError extends Error {
 
 /** The AI answered but the output could not be validated. */
 export class AiValidationError extends Error {
+  /** The raw zod error, when validation was the failure mode. */
+  raw: unknown;
   constructor(
     message = "The AI returned an unexpected response. Try again in a moment.",
+    raw?: unknown,
   ) {
     super(message);
     this.name = "AiValidationError";
+    this.raw = raw;
   }
 }
 
@@ -50,6 +69,7 @@ async function callChatApi(
   messages: { role: string; content: string }[],
   maxTokens: number,
   temperature: number,
+  onUsage?: (usage: { prompt_tokens: number; completion_tokens: number }, model: string) => void,
 ): Promise<string> {
   if (!API_KEY()) {
     throw new AiUnavailableError(
@@ -97,7 +117,21 @@ async function callChatApi(
 
       const payload = (await res.json()) as {
         choices?: { message?: { content?: string } }[];
+        usage?: { prompt_tokens?: number; completion_tokens?: number };
+        model?: string;
       };
+      onUsage?.(
+        {
+          prompt_tokens: payload.usage?.prompt_tokens ?? 0,
+          completion_tokens: payload.usage?.completion_tokens ?? 0,
+        },
+        payload.model ?? MODEL(),
+      );
+      lastUsage = {
+        prompt_tokens: payload.usage?.prompt_tokens ?? 0,
+        completion_tokens: payload.usage?.completion_tokens ?? 0,
+      };
+      lastModel = payload.model ?? MODEL();
       const content = payload.choices?.[0]?.message?.content;
       if (typeof content !== "string" || content.length === 0) {
         throw new AiValidationError();
@@ -130,28 +164,33 @@ export async function chatJson<T>({
   schema,
   maxTokens = 2000,
   temperature = 0.3,
+  retryHint,
+  onUsage,
 }: {
   system: string;
   user: string;
   schema: z.ZodType<T>;
   maxTokens?: number;
   temperature?: number;
+  /** Appended on retry attempts so the model can correct its shape. */
+  retryHint?: string;
+  onUsage?: (usage: { prompt_tokens: number; completion_tokens: number }, model: string) => void;
 }): Promise<T> {
   const messages = [
     { role: "system", content: system },
-    { role: "user", content: user },
+    { role: "user", content: retryHint ? `${user}\n\n${retryHint}` : user },
   ];
 
   let lastError: Error = new AiValidationError();
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    const content = await callChatApi(messages, maxTokens, temperature);
+    const content = await callChatApi(messages, maxTokens, temperature, onUsage);
     try {
       return schema.parse(extractJson(content));
     } catch (err) {
       if (err instanceof AiValidationError) {
         lastError = err;
       } else if (err instanceof z.ZodError) {
-        lastError = new AiValidationError();
+        lastError = new AiValidationError(undefined, err);
       } else {
         lastError = new AiValidationError();
       }
