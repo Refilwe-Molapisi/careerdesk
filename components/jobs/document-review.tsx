@@ -20,6 +20,8 @@ import {
   type CareerEntry,
   type DocumentTemplate,
 } from "@/lib/data/types";
+import { createClient } from "@/lib/data/supabase/browser";
+import { markJobApplied } from "@/lib/data/queries/jobs";
 import {
   coverLetterDraftLines,
   cvDraftLines,
@@ -600,6 +602,25 @@ export function DocumentReview({
         ) : null}
       </div>
 
+      {/* Export and application recording */}
+      <ExportPanel
+        jobId={jobId}
+        documents={documents}
+        selected={selected}
+        onExported={(updates) =>
+          setDocuments((docs) =>
+            docs.map((d) =>
+              updates.find((u) => u.id === d.id)
+                ? { ...d, ...updates.find((u) => u.id === d.id)! }
+                : d,
+            ),
+          )
+        }
+        busy={busy}
+        setBusy={setBusy}
+        onError={setError}
+      />
+
       {/* Entry viewer */}
       <Modal
         open={viewingEntry !== null}
@@ -1111,4 +1132,164 @@ function initialEdit(doc: ApplicationDocument): EditState {
   return doc.kind === "cv"
     ? { kind: "cv", ...(content as CvDraft) }
     : { kind: "cover_letter", ...(content as CoverLetterDraft) };
+}
+
+/**
+ * Export, download and the document-verified "mark as applied" (Prompt 8).
+ * The apply action only enables when an approved CV and an approved cover
+ * letter both have an exported PDF; the RPC re-verifies all of it.
+ */
+function ExportPanel({
+  jobId,
+  documents,
+  selected,
+  onExported,
+  busy,
+  setBusy,
+  onError,
+}: {
+  jobId: string;
+  documents: ApplicationDocument[];
+  selected: ApplicationDocument;
+  onExported: (
+    updates: { id: string; pdf_path: string; pdf_sha256: string }[],
+  ) => void;
+  busy: string | null;
+  setBusy: (value: string | null) => void;
+  onError: (message: string | null) => void;
+}) {
+  const router = useRouter();
+
+  const latestApprovedWithPdf = (kind: "cv" | "cover_letter") =>
+    documents
+      .filter(
+        (d) =>
+          d.kind === kind &&
+          d.status === "approved" &&
+          typeof d.pdf_path === "string" &&
+          d.pdf_path !== "",
+      )
+      .sort((a, b) => b.version - a.version)[0] ?? null;
+
+  const approvedCv = latestApprovedWithPdf("cv");
+  const approvedLetter = latestApprovedWithPdf("cover_letter");
+  const canRecordApplication = Boolean(approvedCv && approvedLetter);
+
+  async function exportPdf() {
+    setBusy("export");
+    onError(null);
+    try {
+      const res = await fetch(`/api/documents/${selected.id}/export`, {
+        method: "POST",
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.error ?? "Export failed.");
+      }
+      onExported([
+        {
+          id: selected.id,
+          pdf_path: payload.pdf_path as string,
+          pdf_sha256: payload.pdf_sha256 as string,
+        },
+      ]);
+      toast.success("PDF saved to your private storage.");
+      router.refresh();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Export failed.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function download() {
+    window.open(`/api/documents/${selected.id}/download`, "_blank");
+  }
+
+  async function recordApplication() {
+    if (!approvedCv || !approvedLetter) return;
+    setBusy("apply");
+    onError(null);
+    try {
+      // The server-side RPC re-verifies both documents: owner, approved,
+      // exported. It copies the exact paths and hashes into the application.
+      await markJobApplied(
+        createClient(),
+        jobId,
+        approvedCv.id,
+        approvedLetter.id,
+      );
+      toast.success("Recorded as applied, with both document hashes.");
+      router.refresh();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Could not record it.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="card space-y-3 p-5">
+      <h3 className="text-sm font-semibold text-stone-900">
+        Export and record the application
+      </h3>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={exportPdf}
+          disabled={busy !== null}
+          className="btn-primary"
+        >
+          {busy === "export" ? "Exporting..." : "Export PDF"}
+        </button>
+        {selected.pdf_path ? (
+          <button onClick={download} className="btn-outline">
+            Download PDF
+          </button>
+        ) : (
+          <span className="text-xs text-stone-400">
+            Not exported yet. Export before approving so the exact file that
+            was sent is recorded by hash.
+          </span>
+        )}
+        {selected.pdf_sha256 ? (
+          <span
+            className="chip max-w-48 truncate"
+            title={`SHA-256: ${selected.pdf_sha256}`}
+          >
+            sha256: {selected.pdf_sha256.slice(0, 12)}...
+          </span>
+        ) : null}
+      </div>
+
+      <div className="rounded-lg border border-stone-100 bg-stone-50 px-3 py-2.5 text-xs leading-relaxed text-stone-600">
+        {canRecordApplication ? (
+          <>
+            <p>
+              CV v{approvedCv!.version} and cover letter v
+              {approvedLetter!.version} are approved and exported.
+            </p>
+            <button
+              onClick={recordApplication}
+              disabled={busy !== null}
+              className="btn-primary mt-2"
+            >
+              <CheckCircle2 className="h-4 w-4" aria-hidden />
+              {busy === "apply" ? "Recording..." : "Mark as applied with these documents"}
+            </button>
+            <p className="mt-1.5 text-stone-400">
+              You still submit them to the employer yourself; this only records
+              what was sent, by file hash.
+            </p>
+          </>
+        ) : (
+          <p>
+            To record an application with its documents, approve and export
+            both a CV and a cover letter for this job. Approved versions with
+            an exported PDF unlock the button above. You can also record a
+            manual application from the job page without documents.
+          </p>
+        )}
+      </div>
+    </section>
+  );
 }

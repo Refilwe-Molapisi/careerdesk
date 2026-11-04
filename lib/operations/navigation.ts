@@ -2,6 +2,7 @@ import {
   Briefcase,
   CalendarCheck,
   FileCheck2,
+  FileText,
   GraduationCap,
   LayoutDashboard,
   NotebookText,
@@ -18,6 +19,7 @@ export type NavItem = {
 export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/jobs", label: "Jobs", icon: Briefcase },
+  { href: "/documents", label: "Documents", icon: FileText },
   { href: "/applications", label: "Applications", icon: FileCheck2 },
   { href: "/record", label: "Career Record", icon: NotebookText },
   { href: "/skills", label: "Skills", icon: GraduationCap },

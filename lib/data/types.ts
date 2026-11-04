@@ -47,6 +47,9 @@ export type UserSettings = {
   id: string;
   user_id: string;
   banned_phrases: string[];
+  full_name: string | null;
+  reminder_email: string | null;
+  reminders_enabled: boolean;
   created_at: string;
 };
 

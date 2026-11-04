@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  // @react-pdf/renderer ships pdfkit and friends with dynamic requires that
+  // must stay outside the server bundle.
+  serverExternalPackages: ["@react-pdf/renderer"],
 };
 
 export default nextConfig;

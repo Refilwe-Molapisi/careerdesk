@@ -100,13 +100,19 @@ export async function getApplicationForJob(
   return (data as Application) ?? null;
 }
 
-/** Atomic server-side RPC: sets status applied + creates the applications row. */
+/** Atomic server-side RPC: sets status applied + creates the applications row.
+ *  With document ids, the RPC verifies each is an approved version with an
+ *  exported PDF and copies the exact storage paths and SHA-256 hashes. */
 export async function markJobApplied(
   client: QueryClient,
   jobId: string,
+  cvDocumentId?: string,
+  coverLetterDocumentId?: string,
 ): Promise<void> {
   const { error } = await client.rpc("mark_job_applied", {
     p_job_id: jobId,
+    p_cv_document_id: cvDocumentId ?? null,
+    p_cover_letter_document_id: coverLetterDocumentId ?? null,
   });
   if (error) throw new Error(error.message);
 }

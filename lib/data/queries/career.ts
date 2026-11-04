@@ -142,3 +142,15 @@ export async function saveBannedPhrases(
   );
   if (error) throw new Error(error.message);
 }
+
+export async function saveProfile(
+  client: QueryClient,
+  userId: string,
+  values: { full_name: string | null; reminder_email?: string | null },
+): Promise<void> {
+  const { error } = await client.from("user_settings").upsert(
+    { user_id: userId, ...values },
+    { onConflict: "user_id" },
+  );
+  if (error) throw new Error(error.message);
+}

@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/data/auth";
 import { getUserSettings } from "@/lib/data/queries/career";
 import { APP_NAME, APP_VERSION, DEFAULT_BANNED_PHRASES } from "@/lib/config";
 import { BannedPhrasesCard } from "./banned-phrases-card";
+import { ProfileCard } from "./profile-card";
 import { InstallAppCard } from "./install-app-card";
 import { SignOutCard } from "./sign-out-card";
 
@@ -14,15 +15,14 @@ export const metadata: Metadata = {
 export default async function SettingsPage() {
   const { user, supabase } = await requireUser();
 
-  let bannedPhrases: string[] = [...DEFAULT_BANNED_PHRASES];
+  let settings: Awaited<ReturnType<typeof getUserSettings>> = null;
   try {
-    const settings = await getUserSettings(supabase, user.id);
-    if (settings?.banned_phrases) {
-      bannedPhrases = settings.banned_phrases;
-    }
+    settings = await getUserSettings(supabase, user.id);
   } catch {
     // Table may not exist yet (migration not run): fall back to defaults.
   }
+
+  const bannedPhrases = settings?.banned_phrases ?? [...DEFAULT_BANNED_PHRASES];
 
   return (
     <>
@@ -32,6 +32,12 @@ export default async function SettingsPage() {
       />
 
       <div className="space-y-4">
+        <ProfileCard
+          userId={user.id}
+          email={user.email ?? null}
+          initialFullName={settings?.full_name ?? ""}
+        />
+
         <BannedPhrasesCard userId={user.id} initialPhrases={bannedPhrases} />
 
         <section className="card p-5">
