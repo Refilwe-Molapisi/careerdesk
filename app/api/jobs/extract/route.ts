@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimit } from "@/lib/operations/rate-limit";
 import { createClient } from "@/lib/data/supabase/server";
 import {
   AiUnavailableError,
@@ -24,6 +25,14 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  }
+
+  const limiter = rateLimit(`extract:${user.id}`, 10, 60_000);
+  if (!limiter.ok) {
+    return NextResponse.json(
+      { error: `Too many AI requests. Try again in ${limiter.retryAfterSeconds}s.` },
+      { status: 429, headers: { "Retry-After": String(limiter.retryAfterSeconds) } },
+    );
   }
 
   let body: unknown;

@@ -33,8 +33,12 @@ Operations must keep working when the AI is unavailable: AI features show a clea
 - [x] **Prompt 3** — Database: SQL migrations, RLS on every table, status history and approved-document triggers, private `documents` storage bucket. **Verified against a local Postgres with Supabase-shaped stubs: 18/18 tests pass** (trigger timing, RLS isolation between two users, approved-document immutability, storage folder isolation, constraints).
 - [x] **Prompt 4** — Career Record: grouped list with search and tag filters, add/edit form with two-step missing-evidence warning, CV import through DeepSeek with an accept/edit/discard review (nothing saves automatically), voice samples, banned-phrase list in Settings. **AI layer verified against a fake OpenAI-compatible server: 6/6 tests pass** (JSON parsing, fenced output, malformed-proposal recovery, retry and error mapping).
 - [x] **Prompt 5** — Jobs: intake form (link stored, never scraped; description required) with DeepSeek extraction and a review-and-correct step before saving, off-target flagging for non-target role families, kanban + table board with drag & drop and dropdown status changes (touch included), status history timeline, filters (status, company, found dates, follow-up), follow-up pickers, job detail with notes and Mark-as-applied (atomic RPC, manual-by-design), Dashboard with counts per status, follow-ups due this week and jobs stale for 7 days, Applications page. **AI extraction covered by the same 8/8 fake-server test suite.**
-- [ ] **Prompt 4** — Career Record page, CV import with review, voice samples, banned phrases.
-- [ ] **Prompt 5** — Job intake with AI extraction, jobs board (kanban + table), status history, Dashboard.
+- [x] **Prompt 6** — DeepSeek layer and tailoring pipeline: specialist modules, FIT / DRAFT CV / DRAFT COVER LETTER / CLAIM CHECK, server-side source-id validation plus deterministic number/date/employer checks, one regeneration round, flagged lines can never be approved. Tailoring wizard with untick-able entries. **9/9 validation tests** including the spec's negative cases (fake source id, unsupported number, unknown employer).
+- [x] **Prompt 7** — Review and approval loop: section-by-section editing with clickable sources, "Ask for changes" regenerates only the chosen part and re-runs every check, every save creates a new version, version switching + compare, approval blocks while flags exist and moves the job to Ready, approved versions locked (fork to change).
+- [x] **Prompt 8** — PDF export with @react-pdf/renderer (two ATS-friendly templates), private-storage upload named Firstname-Surname_Company_Role_vN.pdf, SHA-256 recorded, 60-second signed-URL download, document-verified mark-as-applied RPC, Documents page with template filter. **Migration harness 22/22.**
+- [x] **Prompt 9** — Daily Resend reminders via Vercel Cron at 07:00 SAST: follow-ups due/overdue, stale Applied jobs, plan items due this week; skipped when quiet; CRON_SECRET protected; Settings toggle + test email.
+- [x] **Prompt 10** — Plan tracker: weekly hour grid (16h targets, 20h warning, Sunday rest enforced in UI and DB), monthly learning topics, the six portfolio projects with deliverable ticks, Saturday review with the spec's six questions, exam-week toggle.
+- [x] **Prompt 11** — Quality pass: route crawl, per-layer access-control checks, secrets grep of client bundles, security headers, AI-route rate limits, Playwright E2E suite (mocked DeepSeek) with the poisoned-draft case, full deployment docs. See the "Quality pass" section for what was verified here versus what needs a live project.
 
 ## Local setup
 
@@ -75,6 +79,22 @@ Apply them in the Supabase SQL editor (run each file in order) or with `supabase
 - A document that was ever approved can never be altered or deleted; superseding it is the only permitted change, and superseded rows are locked completely. This is what keeps sent documents immutable.
 - Interpretation notes: the spec's Prompt 5 extraction returns preferred skills, seniority, closing date, application instructions and a role-family reason, so those columns were added in `0005` rather than squeezing them into `notes`; `applications` is one row per job (`unique(job_id)`); `applications.created_at` added for consistency.
 
+## Quality pass (Prompt 11)
+
+Run once after Prompt 11; run again after later prompts.
+
+| Check | Result |
+| --- | --- |
+| Route crawl (every page + API unauthenticated) | private pages 307 to `/login`, APIs JSON 401, public assets 200, unknown pages 307 — verified with a live server |
+| Access control per layer | RLS isolation (SQL + node tests, two users), storage folder isolation, every route handler re-checks session + ownership of the URL id; cron without/with wrong secret returns 401 — verified |
+| Rate limits | all AI routes (`import`, `extract`, `tailor`) 10 req/min per user with `Retry-After`; export 20/min; test email 3/min — in-memory, best effort per serverless instance |
+| Input size limits | CV text and job description capped at 30,000 chars; instructions 500; allowed-entry lists 60 ids; drafts rejected by zod schemas |
+| Secrets | `.next/static` (client bundles) greps clean for every key name and key-shaped value; DeepSeek key exists only in the server-only module |
+| Security headers | CSP, X-Frame-Options DENY, X-Content-Type-Options, Referrer-Policy, Permissions-Policy set for all routes — verified via response headers |
+| Lighthouse mobile | **not run**: the build sandbox has no full browser benchmark setup; run Chrome DevTools -> Lighthouse on the deployed site (PWA + a11y expected green; flag anything under 90) |
+| Playwright E2E | `e2e/full-flow.spec.ts` + a mocked DeepSeek server (`e2e/deepseek-mock.mjs`) cover the full flow including the spec's negative case (fake source id + unsupported number must surface as flagged, approval blocked). Chromium installs and launches in CI-like sandboxes; a **real run needs a throwaway Supabase project** (`E2E_SUPABASE_URL`, `E2E_SUPABASE_ANON_KEY`) — the same negative cases are proven at unit level by `scripts/test_tailoring_validation.ts` (9/9) |
+| Manual flow test | not run here (no live Supabase/DeepSeek); walk it once on the deployed app per the first-run checklist |
+
 ## Testing
 
 - `supabase/tests/rls_isolation_test.sql` — run the whole file in the Supabase SQL editor; rolls back, leaves no data. Confirms another user and the anonymous role see zero of your rows.
@@ -109,6 +129,46 @@ Apply them in the Supabase SQL editor (run each file in order) or with `supabase
 3. Add environment variables from `.env.example` (Production and Preview).
 4. In Supabase: set **Site URL** to your production URL and add `https://<your-app>.vercel.app/auth/callback` to **Redirect URLs**.
 5. Deploy, then sign in once and disable new sign-ups in Supabase if you have not already.
+
+### Environment variables (all of them)
+
+| Variable | Set in | Used by |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Vercel + local | everything (build-time for `NEXT_PUBLIC_*`) |
+| `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL` | Vercel + local | extraction, fit report, drafting, claim check |
+| `RESEND_API_KEY`, `REMINDER_FROM_EMAIL` | Vercel + local | daily reminders, test email |
+| `CRON_SECRET` | Vercel + local | protects the cron route |
+| `SUPABASE_SERVICE_ROLE_KEY` | Vercel + local (server only) | lets the cron read reminder settings |
+
+### Cron
+
+`vercel.json` schedules `GET /api/cron/daily-reminders` at `0 5 * * *` UTC,
+which is 07:00 in Africa/Johannesburg (SAST is UTC+2 all year). Vercel sends
+`Authorization: Bearer <CRON_SECRET>` automatically when `CRON_SECRET` is
+set. The route is idempotent to read and skips users with nothing due.
+
+### Resend
+
+Verify your sending domain in Resend (Domains -> Add domain, add the DNS
+records) before using your own address in `REMINDER_FROM_EMAIL`. Until then
+Resend's test sender works for "Send test email" from Settings.
+
+### First-run checklist
+
+1. Supabase project created; migrations 0001-0006 run in the SQL editor.
+2. Sign up once with your own email, then turn off new sign-ups
+   (Authentication -> Providers -> Email -> disable sign ups).
+3. Set Site URL to your production URL and add
+   `https://<your-app>.vercel.app/auth/callback` to Redirect URLs.
+4. Vercel env vars set (table above), then **Redeploy** so the build picks
+   them up.
+5. Settings: fill your full name (PDF file names), check the banned-phrase
+   list, add a voice sample, set the reminder address and send a test email.
+6. Record: add entries with evidence; Jobs: paste your first description,
+   run the fit report, tailor, review, approve, export, apply manually, mark
+   as applied.
+7. Run `node supabase/tests/rls-test.mjs <url> <anon-key>` against the test
+   project before switching it off for others.
 
 ### Troubleshooting: the deployed site says no server / shows an error
 
