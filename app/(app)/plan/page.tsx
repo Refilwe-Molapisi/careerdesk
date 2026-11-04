@@ -1,26 +1,44 @@
 import type { Metadata } from "next";
-import { CalendarCheck } from "lucide-react";
-import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { requireUser } from "@/lib/data/auth";
+import {
+  listDeliverables,
+  listHourLogs,
+  listPlanItems,
+  listProjects,
+  listWeeklyReviews,
+} from "@/lib/data/queries/plan";
+import { PlanView } from "@/components/plan/plan-view";
 
 export const metadata: Metadata = {
   title: "Plan",
 };
 
 export default async function PlanPage() {
-  await requireUser();
+  const { user, supabase } = await requireUser();
+
+  const [logs, items, projects, deliverables, reviews] = await Promise.all([
+    listHourLogs(supabase),
+    listPlanItems(supabase),
+    listProjects(supabase),
+    listDeliverables(supabase),
+    listWeeklyReviews(supabase),
+  ]);
 
   return (
     <>
       <PageHeader
         title="Plan"
-        description="Weekly hours, learning topics and portfolio deliverables, tracked against your targets."
+        description="16 hours a week across five categories, the monthly learning topics, the six portfolio projects, and a Saturday review. Exams come first; Sunday is rest."
       />
-      <EmptyState
-        icon={CalendarCheck}
-        title="Plan tracker comes later"
-        description="The weekly hour log, checklists and Saturday review arrive after the application flow works end to end."
+      <PlanView
+        userId={user.id}
+        initialLogs={logs}
+        initialItems={items}
+        projects={projects}
+        deliverables={deliverables}
+        reviews={reviews}
+        nowIso={new Date().toISOString()}
       />
     </>
   );

@@ -35,7 +35,7 @@ import { Modal } from "@/components/ui/modal";
 
 type DocumentReviewProps = {
   jobId: string;
-  documents: ApplicationDocument[];
+  documents: import("@/lib/data/types").ApplicationDocument[];
   entries: CareerEntry[];
   initialDocumentId: string;
 };

@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ApplicationDocument, Job } from "@/lib/data/types";
+import type { Job } from "@/lib/data/types";
 
 /**
  * Daily reminder email (Prompt 9): follow-ups due today or overdue, jobs in
@@ -130,9 +130,6 @@ export function buildReminderEmail(data: ReminderData): {
     ${section("Plan items due this week", planItems)}
     <p style="margin:24px 0 0;color:#9ca3af;font:400 11px/1.5;">Sent by your Career Desk. Change or switch these off in Settings.</p>
   </div>`;
-
-  const parts = [data.followUps.length, data.staleApplied.length, data.planItems.length];
-  const subject = `Career Desk: ${parts.filter((n) => n > 0).map((n) => `${n} item${n === 1 ? "" : "s"}`).join(", ") || "nothing due"}`;
 
   return { subject: `Career Desk reminders: ${totalItems(data)} due today`, html };
 }
