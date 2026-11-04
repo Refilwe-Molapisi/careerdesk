@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { CheckCircle2, CalendarClock, FileText } from "lucide-react";
+import { RecommendationCard } from "@/components/jobs/recommendation-card";
 import { createClient } from "@/lib/data/supabase/browser";
 import { markJobApplied, updateJob } from "@/lib/data/queries/jobs";
 import {
@@ -277,6 +278,8 @@ export function JobDetailClient({
           </p>
         </section>
       ) : null}
+
+      <RecommendationCard job={job} />
 
       {/* Documents */}
       <section className="card p-5">

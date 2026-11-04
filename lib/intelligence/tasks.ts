@@ -34,7 +34,8 @@ export type TaskName =
   | "claim_check"
   | "revise_lines"
   | "skill_assessment"
-  | "eligibility_check";
+  | "eligibility_check"
+  | "priority_explanation";
 
 type TaskDef<TSchema extends z.ZodTypeAny> = {
   name: TaskName;

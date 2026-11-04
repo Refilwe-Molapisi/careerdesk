@@ -37,6 +37,8 @@ export default async function SettingsPage() {
           userId={user.id}
           email={user.email ?? null}
           initialFullName={settings?.full_name ?? ""}
+          initialMinimumSalary={settings?.minimum_salary?.toString() ?? ""}
+          initialMinimumSalaryCurrency={settings?.minimum_salary_currency ?? ""}
         />
 
         <BannedPhrasesCard userId={user.id} initialPhrases={bannedPhrases} />

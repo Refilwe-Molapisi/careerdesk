@@ -150,6 +150,10 @@ export async function saveProfile(
     full_name?: string | null;
     reminder_email?: string | null;
     reminders_enabled?: boolean;
+    minimum_salary?: number | null;
+    minimum_salary_currency?: string | null;
+    monthly_cap_usd?: number | null;
+    recording_retention_days?: number | null;
   },
 ): Promise<void> {
   const { error } = await client.from("user_settings").upsert(

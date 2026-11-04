@@ -11,9 +11,14 @@ import { listJobs } from "@/lib/data/queries/jobs";
 import {
   JOB_STATUSES,
   JOB_STATUS_LABELS,
+  TARGET_ROLE_FAMILIES,
   type Job,
   type JobStatus,
 } from "@/lib/data/types";
+import {
+  RECOMMENDATION_LABELS,
+  recommendationRank,
+} from "@/lib/operations/prioritise";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 
@@ -93,6 +98,55 @@ export default async function DashboardPage() {
       />
 
       <div className="space-y-6">
+        {/* This week (Prompt 23): up to five jobs by recommendation,
+            closing date and follow-up due. */}
+        {(() => {
+          const thisWeek = jobs
+            .filter((j) => !["offer", "rejected", "withdrawn", "closed"].includes(j.status))
+            .sort((a, b) => {
+              const rec = recommendationRank(a) - recommendationRank(b);
+              if (rec !== 0) return rec;
+              const aDue = a.closing_date ?? a.follow_up_date ?? "9999-12-31";
+              const bDue = b.closing_date ?? b.follow_up_date ?? "9999-12-31";
+              if (aDue !== bDue) return aDue < bDue ? -1 : 1;
+              return recommendationRank(a) - recommendationRank(b);
+            })
+            .slice(0, 5);
+          if (thisWeek.length === 0) return null;
+          return (
+            <section className="card p-5" aria-label="This week">
+              <h2 className="text-base font-semibold text-stone-900">This week</h2>
+              <p className="mt-0.5 text-xs text-stone-500">
+                Up to five jobs ordered by recommendation, closing date and
+                follow-up due. Off-target families are labelled.
+              </p>
+              <ol className="mt-3 space-y-2">
+                {thisWeek.map((job, i) => (
+                  <li key={job.id} className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-stone-100 px-3 py-2">
+                    <span className="min-w-0 text-sm">
+                      <span className="mr-1.5 font-semibold text-stone-300">{i + 1}.</span>
+                      <Link href={`/jobs/${job.id}`} className="font-medium text-stone-900 hover:text-accent">
+                        {job.title ?? "Untitled role"}
+                      </Link>
+                      <span className="ml-1.5 text-xs text-stone-500">{job.company ?? ""}</span>
+                      {!TARGET_ROLE_FAMILIES.includes(job.role_family) ? (
+                        <span className="chip ml-1.5 !border-amber-200 !bg-amber-50 !text-amber-800">off-target</span>
+                      ) : null}
+                    </span>
+                    <span className="flex items-center gap-1.5 text-xs text-stone-500">
+                      {job.recommendation ? (
+                        <span className="chip">{RECOMMENDATION_LABELS[job.recommendation]}</span>
+                      ) : null}
+                      {job.closing_date ? <span>closes {job.closing_date}</span> : null}
+                      {job.follow_up_date ? <span>follow-up {job.follow_up_date}</span> : null}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          );
+        })()}
+
         {/* Counts per status */}
         <section aria-label="Counts per status">
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-9">

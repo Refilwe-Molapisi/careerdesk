@@ -9,11 +9,23 @@ type ProfileCardProps = {
   userId: string;
   email: string | null;
   initialFullName: string;
+  initialMinimumSalary: string;
+  initialMinimumSalaryCurrency: string;
 };
 
 /** Full name used in exported PDF file names (Prompt 8). */
-export function ProfileCard({ userId, email, initialFullName }: ProfileCardProps) {
+export function ProfileCard({
+  userId,
+  email,
+  initialFullName,
+  initialMinimumSalary,
+  initialMinimumSalaryCurrency,
+}: ProfileCardProps) {
   const [fullName, setFullName] = useState(initialFullName);
+  const [minimumSalary, setMinimumSalary] = useState(initialMinimumSalary);
+  const [minimumSalaryCurrency, setMinimumSalaryCurrency] = useState(
+    initialMinimumSalaryCurrency,
+  );
   const [saving, setSaving] = useState(false);
 
   async function save(e: React.FormEvent) {
@@ -22,6 +34,8 @@ export function ProfileCard({ userId, email, initialFullName }: ProfileCardProps
     try {
       await saveProfile(createClient(), userId, {
         full_name: fullName.trim() || null,
+        minimum_salary: minimumSalary ? Number(minimumSalary) : null,
+        minimum_salary_currency: minimumSalaryCurrency.trim() || null,
       });
       toast.success("Profile saved.");
     } catch (err) {
@@ -55,6 +69,34 @@ export function ProfileCard({ userId, email, initialFullName }: ProfileCardProps
           {saving ? "Saving..." : "Save"}
         </button>
       </form>
+      <div className="mt-4 flex flex-wrap items-end gap-2 border-t border-stone-100 pt-4">
+        <div>
+          <label htmlFor="min-salary" className="label">
+            Minimum salary (Prompt 23 factor)
+          </label>
+          <input
+            id="min-salary"
+            type="number"
+            min={0}
+            value={minimumSalary}
+            onChange={(e) => setMinimumSalary(e.target.value)}
+            className="input sm:max-w-40"
+            placeholder="e.g. 30000"
+          />
+        </div>
+        <div>
+          <label htmlFor="min-currency" className="label">
+            Currency
+          </label>
+          <input
+            id="min-currency"
+            value={minimumSalaryCurrency}
+            onChange={(e) => setMinimumSalaryCurrency(e.target.value)}
+            className="input sm:max-w-24"
+            placeholder="ZAR"
+          />
+        </div>
+      </div>
       <p className="mt-2 text-xs text-stone-400">
         Signed in as {email ?? "unknown"}.
       </p>

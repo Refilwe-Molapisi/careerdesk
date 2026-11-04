@@ -18,6 +18,7 @@ import { runClaimCheck } from "@/lib/intelligence/tasks/claim-check";
 import { runReviseLines } from "@/lib/intelligence/tasks/revise";
 import { runSkillAssessment } from "@/lib/intelligence/tasks/skill-assessment";
 import "@/lib/intelligence/tasks/eligibility";
+import "@/lib/intelligence/tasks/priority";
 import type { EntryText } from "@/lib/intelligence/validate";
 
 /**
