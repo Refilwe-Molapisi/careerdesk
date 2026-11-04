@@ -72,14 +72,17 @@ running it twice against a fresh database.
 
 | File | Creates |
 | --- | --- |
-
-| File | Creates |
-| --- | --- |
 | `0001_core_schema.sql` | career_entries, voice_samples, jobs, application_documents, applications, status_history, projects, project_deliverables, plan_items, hour_logs, weekly_reviews — RLS on every table, owner-only policies |
 | `0002_triggers.sql` | status_history written automatically on every jobs.status change (creation row on insert, transitions on update); approved/superseded application_documents locked against edit and delete (only superseding allowed) |
 | `0003_storage_documents_bucket.sql` | private `documents` bucket; users read/write only inside their own `<user_id>/` folder |
 | `0004_user_settings.sql` | user_settings with the banned-phrase list (Prompt 4) |
 | `0005_job_extraction_fields.sql` | preferred_skills, seniority, closing_date, application_instructions, role_family_reason on jobs; `mark_job_applied()` RPC (atomic status change + applications row) |
+| `0006_documents_plan_and_reminders.sql` | document version columns (source_map, template), plan_items, reminder fields on user_settings |
+| `0007_skills.sql` | skills, skill_evidence, skill_assessments, role_skill_requirements, ai_assessments — DB triggers enforce the evidence rules (intermediate+ needs employment/project evidence; certificates cap at basic) |
+| `0008_ai_usage.sql` | ai_usage ledger (task, tokens, estimated cost, retries) |
+| `0009_eligibility.sql` | jobs eligibility columns (employer_country, eligible_countries, engagement_model, salary, eligibility_status, eligibility_evidence) |
+| `0010_quality.sql` | corrections, prompt_rules, eval_cases; user_settings gains salary floor, monthly AI cap, recording retention |
+| `0011_recommendation.sql` | jobs recommendation columns (recommendation, recommendation_factors, recommendation_note, recommendation_overridden, override_reason) |
 
 Apply them in the Supabase SQL editor (run each file in order) or with `supabase db push` if you use the CLI. Notes:
 
@@ -188,7 +191,7 @@ Resend's test sender works for "Send test email" from Settings.
 
 ### First-run checklist
 
-1. Supabase project created; migrations 0001-0006 run in the SQL editor.
+1. Supabase project created; paste `supabase/apply_all_migrations.sql` into the SQL editor (idempotent, covers 0001-0011 and everything added later by re-running it).
 2. Sign up once with your own email, then turn off new sign-ups
    (Authentication -> Providers -> Email -> disable sign ups).
 3. Set Site URL to your production URL and add
