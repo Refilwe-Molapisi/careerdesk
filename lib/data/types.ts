@@ -237,3 +237,32 @@ export type Application = {
   next_action_date: string | null;
   created_at: string;
 };
+
+export type ApplicationDocument = {
+  id: string;
+  user_id: string;
+  job_id: string;
+  kind: "cv" | "cover_letter";
+  version: number;
+  parent_version_id: string | null;
+  template: string | null;
+  status: "draft" | "approved" | "superseded";
+  content_json: unknown;
+  source_map: unknown;
+  pdf_path: string | null;
+  pdf_sha256: string | null;
+  approved_at: string | null;
+  created_at: string;
+};
+
+export type DocumentTemplate = "bi_commercial" | "risk_research";
+
+export const DOCUMENT_TEMPLATES: DocumentTemplate[] = [
+  "bi_commercial",
+  "risk_research",
+];
+
+export const DOCUMENT_TEMPLATE_LABELS: Record<DocumentTemplate, string> = {
+  bi_commercial: "BI and commercial",
+  risk_research: "Risk and research",
+};

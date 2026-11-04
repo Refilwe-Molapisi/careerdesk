@@ -3,12 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireUser } from "@/lib/data/auth";
-import {
-  getApplicationForJob,
-  getJob,
-  listJobDocuments,
-  listStatusHistory,
-} from "@/lib/data/queries/jobs";
+import { getApplicationForJob, getJob, listStatusHistory } from "@/lib/data/queries/jobs";
+import { listJobDocuments } from "@/lib/data/queries/documents";
 import { JobDetailClient } from "@/components/jobs/job-detail-client";
 
 export const metadata: Metadata = {
@@ -48,7 +44,7 @@ export default async function JobDetailPage({
         job={job}
         history={history}
         applied={application !== null}
-        documentCount={documents.length}
+        documents={documents}
       />
     </>
   );

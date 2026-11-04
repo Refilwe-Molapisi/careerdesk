@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import { CheckCircle2, CalendarClock, FileText } from "lucide-react";
 import { createClient } from "@/lib/data/supabase/browser";
@@ -12,6 +13,7 @@ import {
   ROLE_FAMILY_LABELS,
   TARGET_ROLE_FAMILIES,
   WORK_MODE_LABELS,
+  type ApplicationDocument,
   type Job,
   type JobStatus,
   type StatusHistoryEntry,
@@ -22,14 +24,14 @@ type JobDetailClientProps = {
   job: Job;
   history: StatusHistoryEntry[];
   applied: boolean;
-  documentCount: number;
+  documents: ApplicationDocument[];
 };
 
 export function JobDetailClient({
   job,
   history,
   applied,
-  documentCount,
+  documents,
 }: JobDetailClientProps) {
   const router = useRouter();
   const [notes, setNotes] = useState(job.notes ?? "");
@@ -271,20 +273,58 @@ export function JobDetailClient({
 
       {/* Documents */}
       <section className="card p-5">
-        <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-900">
-          <FileText className="h-4 w-4 text-stone-400" aria-hidden />
-          CV and cover letter versions
-        </h3>
-        {documentCount === 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-900">
+            <FileText className="h-4 w-4 text-stone-400" aria-hidden />
+            CV and cover letter versions
+          </h3>
+          {job.description && job.description.trim().length >= 50 ? (
+            <Link
+              href={`/jobs/${job.id}/tailor`}
+              className="btn-outline !border-accent/40 !text-accent hover:!bg-accent-soft"
+            >
+              {documents.some((d) => d.status === "draft")
+                ? "Continue tailoring"
+                : "Tailor my application"}
+            </Link>
+          ) : null}
+        </div>
+        {documents.length === 0 ? (
           <p className="mt-2 text-xs leading-relaxed text-stone-400">
-            None yet. Tailoring from your Career Record arrives in the next
-            stage of the build; versions will be listed here.
+            None yet. Tailoring drafts a CV and cover letter from your Career
+            Record, checks every line against it, and saves versions here.
           </p>
         ) : (
-          <p className="mt-2 text-xs text-stone-500">
-            {documentCount} {documentCount === 1 ? "version" : "versions"} on
-            record.
-          </p>
+          <ul className="mt-3 space-y-2">
+            {documents.map((doc) => (
+              <li key={doc.id}>
+                <Link
+                  href={`/jobs/${job.id}/review?doc=${doc.id}`}
+                  className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-stone-100 px-3 py-2 hover:border-accent/40"
+                >
+                  <span className="text-sm font-medium text-stone-800">
+                    {doc.kind === "cv" ? "CV" : "Cover letter"} v{doc.version}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      className={
+                        doc.status === "approved"
+                          ? "chip !border-emerald-200 !bg-emerald-50 !text-emerald-700"
+                          : doc.status === "superseded"
+                            ? "chip !text-stone-400"
+                            : "chip"
+                      }
+                    >
+                      {doc.status}
+                    </span>
+                    <span className="text-xs text-stone-400">
+                      {formatDateTime(doc.created_at)}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 

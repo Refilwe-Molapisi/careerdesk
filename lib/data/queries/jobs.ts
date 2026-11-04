@@ -121,26 +121,3 @@ export async function listApplications(
   if (error) throw new Error(error.message);
   return (data ?? []) as Application[];
 }
-
-/** Documents linked to a job (tailoring arrives in a later prompt). */
-export type DocumentStub = {
-  id: string;
-  kind: "cv" | "cover_letter";
-  version: number;
-  status: "draft" | "approved" | "superseded";
-  template: string | null;
-  created_at: string;
-};
-
-export async function listJobDocuments(
-  client: QueryClient,
-  jobId: string,
-): Promise<DocumentStub[]> {
-  const { data, error } = await client
-    .from("application_documents")
-    .select("id, kind, version, status, template, created_at")
-    .eq("job_id", jobId)
-    .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
-  return (data ?? []) as DocumentStub[];
-}
