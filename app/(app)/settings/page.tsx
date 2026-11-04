@@ -5,6 +5,7 @@ import { getUserSettings } from "@/lib/data/queries/career";
 import { APP_NAME, APP_VERSION, DEFAULT_BANNED_PHRASES } from "@/lib/config";
 import { BannedPhrasesCard } from "./banned-phrases-card";
 import { ProfileCard } from "./profile-card";
+import { RemindersCard } from "./reminders-card";
 import { InstallAppCard } from "./install-app-card";
 import { SignOutCard } from "./sign-out-card";
 
@@ -39,6 +40,13 @@ export default async function SettingsPage() {
         />
 
         <BannedPhrasesCard userId={user.id} initialPhrases={bannedPhrases} />
+
+        <RemindersCard
+          userId={user.id}
+          initialEmail={settings?.reminder_email ?? ""}
+          initialEnabled={settings?.reminders_enabled ?? false}
+          fallbackEmail={user.email ?? ""}
+        />
 
         <section className="card p-5">
           <h2 className="mb-4 text-base font-semibold text-stone-900">
