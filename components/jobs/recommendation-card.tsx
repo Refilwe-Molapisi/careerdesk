@@ -25,7 +25,7 @@ export function RecommendationCard({ job }: { job: Job }) {
   const [overrideReason, setOverrideReason] = useState("");
 
   const factors = (job.recommendation_factors ?? []) as RecommendationFactor[];
-  const hasRecommendation = job.recommendation !== null;
+  const hasRecommendation = job.recommendation != null;
 
   async function compute() {
     setBusy(true);

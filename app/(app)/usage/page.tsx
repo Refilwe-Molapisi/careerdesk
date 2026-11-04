@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/page-header";
 import { requireUser } from "@/lib/data/auth";
+import { MigrationNotice } from "@/components/ui/migration-notice";
 
 export const metadata: Metadata = {
   title: "Usage",
@@ -17,7 +18,9 @@ export default async function UsagePage() {
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
-  const [usage, docs] = await Promise.all([
+  let usage, docs;
+  try {
+    const result = await Promise.all([
     supabase
       .from("ai_usage")
       .select("task, provider, input_tokens, output_tokens, estimated_cost, status, retry_count, created_at")
@@ -26,7 +29,12 @@ export default async function UsagePage() {
       .from("application_documents")
       .select("id", { count: "exact", head: true })
       .not("pdf_path", "is", null),
-  ]);
+    ]);
+    usage = result[0];
+    docs = result[1];
+  } catch {
+    return <MigrationNotice tables="ai_usage" migration="0008_ai_usage.sql" />;
+  }
 
   const rows = usage.data ?? [];
   const ok = rows.filter((r) => r.status === "ok");

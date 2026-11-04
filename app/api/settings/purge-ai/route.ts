@@ -26,6 +26,12 @@ export async function POST() {
       .delete({ count: "exact" })
       .eq("user_id", user.id);
     if (error) {
+      // A table from a migration that has not been applied yet is not a
+      // failure: there is nothing of the user's in it to delete.
+      if (error.code === "42P01" || /does not exist/i.test(error.message)) {
+        deleted[table] = 0;
+        continue;
+      }
       return NextResponse.json(
         { error: `${table}: ${error.message}` },
         { status: 500 },

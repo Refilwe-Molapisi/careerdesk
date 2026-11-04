@@ -25,13 +25,16 @@ export function EligibilityBadge({
   status,
   className,
 }: {
-  status: Job["eligibility_status"];
+  status: Job["eligibility_status"] | undefined;
   className?: string;
 }) {
+  // Rows saved before the eligibility migration have no status; show
+  // unverified instead of crashing or rendering an empty chip.
+  const resolved = status ?? "unverified";
   return (
-    <span className={cn("chip", ELIGIBILITY_CHIP[status], className)}>
+    <span className={cn("chip", ELIGIBILITY_CHIP[resolved], className)}>
       <Globe className="h-3 w-3" aria-hidden />
-      {ELIGIBILITY_LABELS[status]}
+      {ELIGIBILITY_LABELS[resolved]}
     </span>
   );
 }

@@ -309,13 +309,13 @@ export function JobDetailClient({
             </div>
           ) : null}
         </div>
-        {job.eligibility_evidence.length > 0 ? (
+        {(job.eligibility_evidence ?? []).length > 0 ? (
           <div className="mt-3 rounded-lg border border-stone-100 bg-stone-50 px-3 py-2.5">
             <p className="text-xs font-semibold text-stone-700">
               Eligibility evidence from the posting
             </p>
             <ul className="mt-1.5 space-y-1.5">
-              {job.eligibility_evidence.map((item, i) => (
+              {(job.eligibility_evidence ?? []).map((item, i) => (
                 <li key={i} className="text-xs leading-relaxed text-stone-600">
                   <span className="italic">&ldquo;{item.quote}&rdquo;</span>
                   {item.note ? <span className="text-stone-400"> — {item.note}</span> : null}

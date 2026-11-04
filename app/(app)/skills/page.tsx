@@ -9,6 +9,7 @@ import {
   seedSkillsIfEmpty,
 } from "@/lib/data/queries/skills";
 import { SkillsClient } from "@/components/skills/skills-client";
+import { MigrationNotice } from "@/components/ui/migration-notice";
 
 export const metadata: Metadata = {
   title: "Skills",
@@ -17,15 +18,20 @@ export const metadata: Metadata = {
 export default async function SkillsPage() {
   const { user, supabase } = await requireUser();
 
-  // First visit seeds the spec's skill list, all at not_started.
-  await seedSkillsIfEmpty(supabase, user.id);
+  let skills, evidence, assessments, entries;
+  try {
+    // First visit seeds the spec's skill list, all at not_started.
+    await seedSkillsIfEmpty(supabase, user.id);
 
-  const [skills, evidence, assessments, entries] = await Promise.all([
-    listSkills(supabase),
-    listSkillEvidence(supabase),
-    listSkillAssessments(supabase),
-    listCareerEntries(supabase),
-  ]);
+    [skills, evidence, assessments, entries] = await Promise.all([
+      listSkills(supabase),
+      listSkillEvidence(supabase),
+      listSkillAssessments(supabase),
+      listCareerEntries(supabase),
+    ]);
+  } catch {
+    return <MigrationNotice tables="skills" migration="0007_skills.sql" />;
+  }
 
   return (
     <>
