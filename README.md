@@ -110,4 +110,19 @@ Apply them in the Supabase SQL editor (run each file in order) or with `supabase
 4. In Supabase: set **Site URL** to your production URL and add `https://<your-app>.vercel.app/auth/callback` to **Redirect URLs**.
 5. Deploy, then sign in once and disable new sign-ups in Supabase if you have not already.
 
+### Troubleshooting: the deployed site says no server / shows an error
+
+This almost always means the Vercel deployment has no environment variables
+yet. `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are read
+at **build** time, and the app refuses to build against a missing Supabase.
+
+1. Check the deployment status in Vercel (Deployments tab). A failed build or
+   "504 / no available deployment" means the env vars were missing.
+2. Add the two Supabase variables under Settings -> Environment Variables
+   (values from Supabase Project Settings -> API). Deploying again is not
+   enough after adding them for the first time: use **Redeploy** from the
+   latest deployment's menu so the build picks them up.
+3. When the app is deployed without configuration on purpose, it shows a
+   "Setup required" screen on /login instead of crashing.
+
 Later prompts extend this section (Resend sender domain, Vercel Cron, backups).
