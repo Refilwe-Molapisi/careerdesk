@@ -4,6 +4,7 @@ import {
   FileCheck2,
   FileText,
   FlaskConical,
+  Gauge,
   GraduationCap,
   LayoutDashboard,
   NotebookText,
@@ -26,5 +27,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/skills", label: "Skills", icon: GraduationCap },
   { href: "/plan", label: "Plan", icon: CalendarCheck },
   { href: "/evaluations", label: "Evaluations", icon: FlaskConical },
+  { href: "/usage", label: "Usage", icon: Gauge },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

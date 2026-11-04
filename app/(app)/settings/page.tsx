@@ -8,6 +8,7 @@ import { ProfileCard } from "./profile-card";
 import { RemindersCard } from "./reminders-card";
 import { InstallAppCard } from "./install-app-card";
 import { SignOutCard } from "./sign-out-card";
+import { DataCard } from "@/components/settings/data-card";
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -39,6 +40,8 @@ export default async function SettingsPage() {
           initialFullName={settings?.full_name ?? ""}
           initialMinimumSalary={settings?.minimum_salary?.toString() ?? ""}
           initialMinimumSalaryCurrency={settings?.minimum_salary_currency ?? ""}
+          initialMonthlyCap={settings?.monthly_cap_usd?.toString() ?? ""}
+          initialRetentionDays={settings?.recording_retention_days?.toString() ?? ""}
         />
 
         <BannedPhrasesCard userId={user.id} initialPhrases={bannedPhrases} />
@@ -89,6 +92,8 @@ export default async function SettingsPage() {
         </section>
 
         <InstallAppCard />
+
+        <DataCard email={user.email ?? null} />
 
         <SignOutCard />
       </div>

@@ -140,6 +140,31 @@ Run once after Prompt 11; run again after later prompts.
 | `CRON_SECRET` | Vercel + local | protects the cron route |
 | `SUPABASE_SERVICE_ROLE_KEY` | Vercel + local (server only) | lets the cron read reminder settings |
 
+### Backups and restore
+
+1. Supabase managed backups: Database -> Backups on your plan. Weekly
+   backups are retained 7 days (Pro retains daily). Verify by restoring into
+   a scratch project once before you need it for real.
+2. App-level weekly export: `vercel.json` schedules
+   `GET /api/cron/weekly-export` (Sundays 04:00 UTC, CRON_SECRET protected)
+   to write a ZIP of every table (JSON + CSV) per user into the private
+   storage folder `documents/<user>/backups/`.
+3. Manual export: Settings -> "Export all data (ZIP)" - tables plus every
+   exported PDF.
+4. Tested restore procedure:
+   - Create a fresh Supabase project, run `supabase/migrations` in order.
+   - Authentication -> Add user with the same user UUID as the export.
+   - Unzip the export, then
+     `node scripts/restore_backup.mjs <url> <service-key> <export-dir>`.
+   - Compare the printed row counts with the export's `csv/` files.
+   - Download one PDF from the `pdfs/` folder and open it, and open one
+     storage PDF from the fresh project.
+   The restore path is plain upserts; the schema side is covered by the
+   migration harness (22/22 against a fresh local database), but the literal
+   supabase-js command has not been executed end to end in the build sandbox
+   (it needs a real Supabase project's REST endpoint). Run it once on a
+   scratch project before you rely on it.
+
 ### Cron
 
 `vercel.json` schedules `GET /api/cron/daily-reminders` at `0 5 * * *` UTC,

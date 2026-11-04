@@ -11,6 +11,8 @@ type ProfileCardProps = {
   initialFullName: string;
   initialMinimumSalary: string;
   initialMinimumSalaryCurrency: string;
+  initialMonthlyCap: string;
+  initialRetentionDays: string;
 };
 
 /** Full name used in exported PDF file names (Prompt 8). */
@@ -20,12 +22,16 @@ export function ProfileCard({
   initialFullName,
   initialMinimumSalary,
   initialMinimumSalaryCurrency,
+  initialMonthlyCap,
+  initialRetentionDays,
 }: ProfileCardProps) {
   const [fullName, setFullName] = useState(initialFullName);
   const [minimumSalary, setMinimumSalary] = useState(initialMinimumSalary);
   const [minimumSalaryCurrency, setMinimumSalaryCurrency] = useState(
     initialMinimumSalaryCurrency,
   );
+  const [monthlyCap, setMonthlyCap] = useState(initialMonthlyCap);
+  const [retentionDays, setRetentionDays] = useState(initialRetentionDays);
   const [saving, setSaving] = useState(false);
 
   async function save(e: React.FormEvent) {
@@ -36,6 +42,8 @@ export function ProfileCard({
         full_name: fullName.trim() || null,
         minimum_salary: minimumSalary ? Number(minimumSalary) : null,
         minimum_salary_currency: minimumSalaryCurrency.trim() || null,
+        monthly_cap_usd: monthlyCap ? Number(monthlyCap) : null,
+        recording_retention_days: retentionDays ? Number(retentionDays) : null,
       });
       toast.success("Profile saved.");
     } catch (err) {
@@ -96,7 +104,42 @@ export function ProfileCard({
             placeholder="ZAR"
           />
         </div>
+        <div>
+          <label htmlFor="monthly-cap" className="label">
+            Monthly AI cap (USD)
+          </label>
+          <input
+            id="monthly-cap"
+            type="number"
+            min={0}
+            step="0.5"
+            value={monthlyCap}
+            onChange={(e) => setMonthlyCap(e.target.value)}
+            className="input sm:max-w-28"
+            placeholder="e.g. 5"
+          />
+        </div>
+        <div>
+          <label htmlFor="retention" className="label">
+            Recording retention (days)
+          </label>
+          <input
+            id="retention"
+            type="number"
+            min={0}
+            value={retentionDays}
+            onChange={(e) => setRetentionDays(e.target.value)}
+            className="input sm:max-w-24"
+            placeholder="e.g. 90"
+          />
+        </div>
       </div>
+      <p className="mt-2 text-xs leading-relaxed text-stone-400">
+        At 80% of the monthly cap the app warns you; at 100% non-essential AI
+        features stop (the tailoring pipeline and eligibility keep working).
+        Recording retention applies to interview audio when that stage is
+        built: recordings older than the setting are deleted automatically.
+      </p>
       <p className="mt-2 text-xs text-stone-400">
         Signed in as {email ?? "unknown"}.
       </p>

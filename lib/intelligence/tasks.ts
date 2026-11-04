@@ -129,6 +129,32 @@ export async function runTask<T = unknown>({
 
   const started = Date.now();
 
+  // Spending cap (Prompt 24): a warning at 80 percent and a hard stop for
+  // non-essential tasks at 100 percent. Essential tasks (the tailoring
+  // pipeline and eligibility) keep working.
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const { data: capRow } = await supabase
+    .from("user_settings")
+    .select("monthly_cap_usd")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const cap = capRow?.monthly_cap_usd != null ? Number(capRow.monthly_cap_usd) : null;
+  if (cap !== null && cap > 0 && !def.essential) {
+    const { data: usageRows } = await supabase
+      .from("ai_usage")
+      .select("estimated_cost")
+      .gte("created_at", monthStart.toISOString());
+    const spent = (usageRows ?? []).reduce(
+      (sum, r) => sum + Number(r.estimated_cost ?? 0),
+      0,
+    );
+    if (spent >= cap) {
+      throw new SpendCapReachedError();
+    }
+  }
+
   // The owner's confirmed rules join the core prompt (Prompt 22 item 6).
   const { data: rules } = await supabase
     .from("prompt_rules")
