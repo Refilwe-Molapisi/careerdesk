@@ -149,8 +149,11 @@ create table if not exists public.projects (
   question text,
   status text not null default 'planned' check (status in ('planned', 'building', 'published')),
   repo_url text,
-  page_url text
+  page_url text,
+  created_at timestamptz not null default now()
 );
+alter table public.projects
+  add column if not exists created_at timestamptz not null default now();
 
 create table if not exists public.project_deliverables (
   id uuid primary key default gen_random_uuid(),
@@ -158,8 +161,11 @@ create table if not exists public.project_deliverables (
   project_id uuid not null references public.projects (id) on delete cascade,
   title text not null,
   done boolean not null default false,
-  done_on date
+  done_on date,
+  created_at timestamptz not null default now()
 );
+alter table public.project_deliverables
+  add column if not exists created_at timestamptz not null default now();
 
 create table if not exists public.plan_items (
   id uuid primary key default gen_random_uuid(),

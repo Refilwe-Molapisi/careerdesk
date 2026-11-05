@@ -8,11 +8,7 @@
 create table if not exists public.user_settings (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null unique references auth.users (id) on delete cascade,
-  banned_phrases text[] not null default '{
-    passionate,results-driven,leverage,synergy,dynamic,go-getter,
-    team player,detail-oriented,proven track record,spearheaded,
-    cutting-edge,innovative,self-starter
-  }',
+  banned_phrases text[] not null default '{passionate,results-driven,leverage,synergy,dynamic,go-getter,team player,detail-oriented,proven track record,spearheaded,cutting-edge,innovative,self-starter}',
   created_at timestamptz not null default now()
 );
 

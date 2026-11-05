@@ -2,7 +2,7 @@
 Generates, from the migration files:
  1. lib/data/schema-expectations.ts - every table + column the migrations
     create, as data the app can check at runtime (Settings -> Database check).
- 2. supabase/fix_now.sql - migrations 0007-0011, compact and paste-friendly
+ 2. supabase/fix_now.sql - migrations 0004-0011 + core column patches, compact
     (comments and blank lines stripped), ending with a PostgREST schema
     cache reload notice.
 
@@ -97,9 +97,16 @@ for f in sorted(os.listdir(MIG)):
             tname, body = m.group(1), m.group(2)
             cols = tables.setdefault(tname, {"columns": set(), "migration": f})["columns"]
             depth = 0
+            in_string = False
             for line in body.splitlines():
                 ls = line.strip()
                 if not ls:
+                    continue
+                if in_string:
+                    # Still inside a multi-line quoted default (e.g. a text[]
+                    # default listing banned phrases): never a column name.
+                    if ls.count("'") % 2 == 1:
+                        in_string = False
                     continue
                 opens = ls.count("(") - ls.count(")")
                 if depth == 0:
@@ -113,6 +120,8 @@ for f in sorted(os.listdir(MIG)):
                 depth += opens
                 if depth < 0:
                     depth = 0
+                if ls.count("'") % 2 == 1:
+                    in_string = True
             continue
         m = re.match(
             r"(?is)^\s*alter\s+table\s+(?:only\s+)?(?:public\.)?(\w+)\s+(.*)$",
@@ -160,28 +169,40 @@ open(os.path.join(ROOT, "lib/data/schema-expectations.ts"), "w").write("\n".join
 print("schema-expectations.ts:", len(expectations), "tables")
 
 # 2. Compact fix_now.sql: migrations 0007-0011 without comments/blanks.
-FIX_FILES = [f for f in sorted(os.listdir(MIG)) if f[:4] in {"0007", "0008", "0009", "0010", "0011"}]
-parts = ["-- Career Desk: fix SQL for the AI skills, usage, eligibility, quality",
-         "-- and recommendation features (migrations 0007-0011, compact form).",
+FIX_FILES = [f for f in sorted(os.listdir(MIG))
+             if f[:4] in {"0004", "0006", "0007", "0008", "0009", "0010", "0011"}]
+parts = ["-- Career Desk: fix SQL for settings, plan, documents and the AI features",
+         "-- (migrations 0004-0011 in compact form, plus two core column patches).",
          "-- Paste the whole file into Supabase Dashboard -> SQL Editor -> Run.",
          "-- Safe to run more than once: every statement tolerates existing objects.",
          "-- If pages still fail afterwards with 'not found in the schema cache',",
          "-- the NOTIFY at the end fixes that: give it a few seconds, then reload.",
+         "",
+         "-- Core patch: created_at on the portfolio tables (added 2026-11) -",
+         "-- older databases created these tables without it.",
+         "alter table public.projects add column if not exists created_at timestamptz not null default now();",
+         "alter table public.project_deliverables add column if not exists created_at timestamptz not null default now();",
          ""]
 for f in FIX_FILES:
     sql = open(os.path.join(MIG, f)).read()
     stmts = split_statements(sql)
     parts.append(f"-- from {f}")
     def policy_id(s):
-        # (name, table) of a `create policy name on table ...` statement
+        # (name, qualified table) of a `create policy name on table ...` statement.
+        # The table may be schema-qualified (storage.objects); capturing only the
+        # first word used to synthesize bogus `on public.storage` drops, which
+        # ERROR in Postgres (no such table) and killed the whole pasted script.
         m = re.match(
-            r'(?is)^\s*create\s+policy\s+(?:"([^"]+)"|(\w+))\s+on\s+(?:public\.)?(\w+)',
+            r'(?is)^\s*create\s+policy\s+(?:"([^"]+)"|(\w+))\s+on\s+((?:(?:public|storage|auth)\.)?\w+)',
             s,
         )
         if not m:
             return None
         name = m.group(1) or m.group(2)
-        return name, m.group(3)
+        table = m.group(3)
+        if "." not in table:
+            table = "public." + table
+        return name, table
 
     for s in stmts:
         # Policies: drop-if-exists + create. Idempotent without dynamic SQL
@@ -190,7 +211,7 @@ for f in FIX_FILES:
         pid = policy_id(s) if re.match(r"(?is)^\s*create\s+policy\s+", s) else None
         if pid and " or replace" not in s.lower():
             name, table = pid
-            pieces = [f'drop policy if exists "{name}" on public.{table};', s + ";"]
+            pieces = [f'drop policy if exists "{name}" on {table};', s + ";"]
         else:
             pieces = []
             for line in s.split("\n"):
@@ -224,11 +245,12 @@ for f in sorted(os.listdir(MIG)):
         pid = policy_id(s) if re.match(r"(?is)^\s*create\s+policy\s+", s) else None
         if pid and " or replace" not in s.lower():
             name, table = pid
-            all_parts.append(f'drop policy if exists "{name}" on public.{table};')
+            all_parts.append(f'drop policy if exists "{name}" on {table};')
             all_parts.append(s + ";")
         else:
             all_parts.append(s + ";")
     all_parts.append("")
+all_parts.append("notify pgrst, 'reload schema';")
 open(os.path.join(ROOT, "supabase/apply_all_migrations.sql"), "w").write(
     "\n".join(all_parts)
 )

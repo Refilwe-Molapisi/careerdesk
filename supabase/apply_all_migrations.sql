@@ -121,16 +121,22 @@ create table if not exists public.projects (
   question text,
   status text not null default 'planned' check (status in ('planned', 'building', 'published')),
   repo_url text,
-  page_url text
+  page_url text,
+  created_at timestamptz not null default now()
 );
+alter table public.projects
+  add column if not exists created_at timestamptz not null default now();
 create table if not exists public.project_deliverables (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   project_id uuid not null references public.projects (id) on delete cascade,
   title text not null,
   done boolean not null default false,
-  done_on date
+  done_on date,
+  created_at timestamptz not null default now()
 );
+alter table public.project_deliverables
+  add column if not exists created_at timestamptz not null default now();
 create table if not exists public.plan_items (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -315,7 +321,7 @@ on conflict (id) do update
   set public = false,
       file_size_limit = coalesce(storage.buckets.file_size_limit, 52428800);
 drop policy if exists "documents_select_own" on storage.objects;
-drop policy if exists "documents_select_own" on public.storage;
+drop policy if exists "documents_select_own" on storage.objects;
 create policy "documents_select_own"
   on storage.objects for select
   to authenticated
@@ -324,7 +330,7 @@ create policy "documents_select_own"
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 drop policy if exists "documents_insert_own" on storage.objects;
-drop policy if exists "documents_insert_own" on public.storage;
+drop policy if exists "documents_insert_own" on storage.objects;
 create policy "documents_insert_own"
   on storage.objects for insert
   to authenticated
@@ -333,7 +339,7 @@ create policy "documents_insert_own"
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 drop policy if exists "documents_update_own" on storage.objects;
-drop policy if exists "documents_update_own" on public.storage;
+drop policy if exists "documents_update_own" on storage.objects;
 create policy "documents_update_own"
   on storage.objects for update
   to authenticated
@@ -346,7 +352,7 @@ create policy "documents_update_own"
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 drop policy if exists "documents_delete_own" on storage.objects;
-drop policy if exists "documents_delete_own" on public.storage;
+drop policy if exists "documents_delete_own" on storage.objects;
 create policy "documents_delete_own"
   on storage.objects for delete
   to authenticated
@@ -359,11 +365,7 @@ create policy "documents_delete_own"
 create table if not exists public.user_settings (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null unique references auth.users (id) on delete cascade,
-  banned_phrases text[] not null default '{
-    passionate,results-driven,leverage,synergy,dynamic,go-getter,
-    team player,detail-oriented,proven track record,spearheaded,
-    cutting-edge,innovative,self-starter
-  }',
+  banned_phrases text[] not null default '{passionate,results-driven,leverage,synergy,dynamic,go-getter,team player,detail-oriented,proven track record,spearheaded,cutting-edge,innovative,self-starter}',
   created_at timestamptz not null default now()
 );
 alter table public.user_settings enable row level security;
@@ -857,3 +859,5 @@ alter table public.jobs
   add column if not exists recommendation_overridden boolean
     not null default false,
   add column if not exists override_reason text;
+
+notify pgrst, 'reload schema';

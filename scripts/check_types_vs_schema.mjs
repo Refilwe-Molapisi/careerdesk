@@ -110,6 +110,16 @@ try {
 
   const typesSrc = readFileSync(join(ROOT, "lib/data/types.ts"), "utf8");
 
+  // Real columns in the migrated public schema, used by every phase below.
+  const { rows: allCols } = await db.query(
+    `select table_name, column_name from information_schema.columns where table_schema='public'`,
+  );
+  const schemaCols = new Map(); // table -> Set(columns)
+  for (const r of allCols) {
+    if (!schemaCols.has(r.table_name)) schemaCols.set(r.table_name, new Set());
+    schemaCols.get(r.table_name).add(r.column_name);
+  }
+
   for (const [table, { type, ignore }] of Object.entries(TABLE_TYPES)) {
     const fields = extractTypeFields(typesSrc, type);
     if (!fields) {
@@ -117,11 +127,7 @@ try {
       failures++;
       continue;
     }
-    const { rows } = await db.query(
-      `select column_name from information_schema.columns where table_schema='public' and table_name=$1`,
-      [table],
-    );
-    const cols = new Set(rows.map((r) => r.column_name));
+    const cols = schemaCols.get(table) ?? new Set();
     const missing = fields.filter((f) => !cols.has(f) && !ignore.includes(f));
     if (missing.length === 0) {
       console.log(`ok  ${table} (${type}): all ${fields.length} fields exist as columns`);
@@ -130,6 +136,124 @@ try {
       failures++;
     }
   }
+
+  // Phase 2: every .order() column in the query layer must exist. This catches
+  // the Plan crash that shipped in Prompt 24: listProjects ordered by a
+  // created_at column that no migration (and no row type) ever defined, while
+  // the row-type check above only sees .select("*") shapes.
+  const queriesDir = join(ROOT, "lib/data/queries");
+  let orderChecked = 0;
+  for (const f of readdirSync(queriesDir).filter((f) => f.endsWith(".ts"))) {
+    const src = readFileSync(join(queriesDir, f), "utf8");
+    const froms = [...src.matchAll(/\.from\("(\w+)"\)/g)];
+    for (const m of src.matchAll(/\.order\("(\w+)"/g)) {
+      const at = m.index;
+      const owner = froms.filter((fm) => fm.index < at).pop();
+      if (!owner) continue;
+      const [table, col] = [owner[1], m[1]];
+      orderChecked++;
+      if (!schemaCols.get(table)?.has(col)) {
+        console.log(`FAIL ${f}: .order("${col}") but ${table} has no such column`);
+        failures++;
+      }
+    }
+  }
+  if (failures === 0) console.log(`ok  .order() columns: ${orderChecked} orderings all valid`);
+
+  // Phase 3: the generated expectations file must match the migrated schema
+  // exactly in both directions (it drives Settings -> Database check).
+  const expSrc = readFileSync(join(ROOT, "lib/data/schema-expectations.ts"), "utf8");
+  const expected = new Map();
+  for (const m of expSrc.matchAll(/table: "(\w+)", migration: "[^"]+", columns: \[([^\]]*)\]/g)) {
+    expected.set(m[1], new Set([...m[2].matchAll(/"(\w+)"/g)].map((c) => c[1])));
+  }
+  let expProblems = 0;
+  for (const [table, cols] of expected) {
+    const real = schemaCols.get(table);
+    if (!real) {
+      console.log(`FAIL expectations: table ${table} does not exist in the migrated schema`);
+      expProblems++;
+      continue;
+    }
+    for (const c of cols) {
+      if (!real.has(c)) {
+        console.log(`FAIL expectations: ${table}.${c} expected but no migration creates it`);
+        expProblems++;
+      }
+    }
+  }
+  for (const [table, real] of schemaCols) {
+    if (!expected.has(table)) {
+      console.log(`FAIL expectations: public.${table} exists but is not in schema-expectations.ts`);
+      expProblems++;
+      continue;
+    }
+    for (const c of real) {
+      if (!expected.get(table).has(c)) {
+        console.log(`FAIL expectations: ${table}.${c} exists in migrations but not in schema-expectations.ts`);
+        expProblems++;
+      }
+    }
+  }
+  failures += expProblems;
+  if (expProblems === 0) console.log(`ok  schema-expectations.ts: ${expected.size} tables match the migrated schema`);
+
+  // Phase 4: execute the two generated paste files verbatim - both on the
+  // fully migrated database (idempotent re-paste) and on a fresh database
+  // (first-time setup). A single failing statement (like the `on
+  // public.storage` drops that once aborted the user's paste halfway through
+  // section 0003) fails the check instead of breaking production silently.
+  const admin = new pg.Client({ host: sockdir, port, user: "postgres", database: "postgres" });
+  await admin.connect();
+  await admin.query("create database freshpaste");
+  await admin.end();
+  const fresh = new pg.Client({ host: sockdir, port, user: "postgres", database: "freshpaste" });
+  await fresh.connect();
+  // Roles are cluster-wide, so the stub only creates them when missing.
+  await fresh.query(`
+    do $$ begin
+      if not exists (select 1 from pg_roles where rolname = 'authenticated') then
+        create role authenticated nologin noinherit;
+      end if;
+      if not exists (select 1 from pg_roles where rolname = 'anon') then
+        create role anon nologin noinherit;
+      end if;
+    end $$;
+    create schema auth;
+    create table auth.users (id uuid primary key default gen_random_uuid(), email text);
+    create or replace function auth.uid() returns uuid language sql stable as $fn$
+      select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+    $fn$;
+    create schema storage;
+    create table storage.buckets (id text primary key, name text, public boolean default false,
+      file_size_limit bigint, allowed_mime_types text[]);
+    create table storage.objects (id uuid primary key default gen_random_uuid(),
+      bucket_id text, name text, owner uuid, owner_id text, metadata jsonb,
+      created_at timestamptz default now(), updated_at timestamptz default now());
+    alter table storage.objects enable row level security;
+    create or replace function storage.foldername(name text) returns text[]
+      language sql immutable as $fn$ select string_to_array(name, '/') $fn$;
+    grant usage on schema public, storage, auth to authenticated, anon;
+    grant all on storage.objects to authenticated, anon;
+  `);
+  for (const file of ["supabase/apply_all_migrations.sql", "supabase/fix_now.sql"]) {
+    const sql = readFileSync(join(ROOT, file), "utf8");
+    try {
+      await db.query(sql);
+      console.log(`ok  ${file}: executes cleanly on a fully migrated database`);
+    } catch (err) {
+      console.log(`FAIL ${file}: ${err.message.split("\n")[0]}`);
+      failures++;
+    }
+    try {
+      await fresh.query(sql);
+      console.log(`ok  ${file}: executes cleanly on a fresh database`);
+    } catch (err) {
+      console.log(`FAIL ${file} (fresh): ${err.message.split("\n")[0]}`);
+      failures++;
+    }
+  }
+  await fresh.end();
 
   await db.end();
   console.log(failures === 0 ? "TYPES VS SCHEMA: OK" : `TYPES VS SCHEMA: ${failures} problem(s)`);
