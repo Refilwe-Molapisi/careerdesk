@@ -9,6 +9,7 @@ import { RemindersCard } from "./reminders-card";
 import { InstallAppCard } from "./install-app-card";
 import { SignOutCard } from "./sign-out-card";
 import { DataCard } from "@/components/settings/data-card";
+import { DatabaseCheckCard } from "./database-check";
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -34,6 +35,7 @@ export default async function SettingsPage() {
       />
 
       <div className="space-y-4">
+        <DatabaseCheckCard supabase={supabase} />
         <ProfileCard
           userId={user.id}
           email={user.email ?? null}

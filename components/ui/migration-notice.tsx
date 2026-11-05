@@ -33,6 +33,7 @@ export function MigrationNotice({
         </p>
         <p className="mt-2 text-xs text-stone-400">
           After running the migration, reload this page. Your data is untouched.
+          Settings &rarr; Database check lists anything else that is missing.
         </p>
       </div>
     </>

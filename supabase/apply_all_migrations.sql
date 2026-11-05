@@ -1,21 +1,9 @@
 -- Career Desk: all migrations, consolidated and idempotent.
 -- Safe to paste into the Supabase SQL Editor even if some migrations
--- have already run: existing tables, columns, policies and triggers
--- are left alone.
+-- have already run: existing tables, columns and triggers are left
+-- alone, and policies are dropped and recreated (they hold no data).
 
 -- ======== 0001_core_schema.sql ========
--- ============================================================================
--- Career Desk - Prompt 3: core schema
--- Every table carries user_id (references auth.users) and has Row Level
--- Security enabled with policies that restrict every operation to the
--- owning user (user_id = auth.uid()).
--- Run in the Supabase SQL editor, or with: supabase db push
--- ============================================================================
-
--- ---------------------------------------------------------------------------
--- Career Record
--- ---------------------------------------------------------------------------
-
 create table if not exists public.career_entries (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -27,18 +15,14 @@ create table if not exists public.career_entries (
   start_date date,
   end_date date,
   description text,
-  -- Required in practice: a number, a link, a file or a plain statement of
-  -- what the user can show. The UI warns when it is empty.
-  evidence text,
+      evidence text,
   tags text[] not null default '{}',
   created_at timestamptz not null default now(),
   constraint career_entries_dates_check
     check (start_date is null or end_date is null or end_date >= start_date)
 );
-
 create index if not exists career_entries_user_type_idx
   on public.career_entries (user_id, type);
-
 create table if not exists public.voice_samples (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -46,11 +30,6 @@ create table if not exists public.voice_samples (
   content text not null,
   created_at timestamptz not null default now()
 );
-
--- ---------------------------------------------------------------------------
--- Jobs and applications
--- ---------------------------------------------------------------------------
-
 create table if not exists public.jobs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -79,12 +58,9 @@ create table if not exists public.jobs (
   notes text,
   created_at timestamptz not null default now()
 );
-
 create index if not exists jobs_user_status_idx on public.jobs (user_id, status);
-
 create index if not exists jobs_user_follow_up_idx on public.jobs (user_id, follow_up_date)
   where follow_up_date is not null;
-
 create table if not exists public.application_documents (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -102,7 +78,6 @@ create table if not exists public.application_documents (
   created_at timestamptz not null default now(),
   constraint application_documents_job_kind_version_key unique (job_id, kind, version)
 );
-
 create table if not exists public.applications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -118,12 +93,8 @@ create table if not exists public.applications (
   next_action text,
   next_action_date date,
   created_at timestamptz not null default now(),
-  -- One tracked application per job; document versions live in
-  -- application_documents and re-applications show up in status_history.
-  constraint applications_job_id_key unique (job_id)
+      constraint applications_job_id_key unique (job_id)
 );
-
--- Audit trail written only by the trigger in 0002_triggers.sql.
 create table if not exists public.status_history (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -142,13 +113,7 @@ create table if not exists public.status_history (
   ),
   changed_at timestamptz not null default now()
 );
-
 create index if not exists status_history_job_idx on public.status_history (job_id, changed_at);
-
--- ---------------------------------------------------------------------------
--- Plan and portfolio
--- ---------------------------------------------------------------------------
-
 create table if not exists public.projects (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -158,7 +123,6 @@ create table if not exists public.projects (
   repo_url text,
   page_url text
 );
-
 create table if not exists public.project_deliverables (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -167,7 +131,6 @@ create table if not exists public.project_deliverables (
   done boolean not null default false,
   done_on date
 );
-
 create table if not exists public.plan_items (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -180,7 +143,6 @@ create table if not exists public.plan_items (
   project_id uuid references public.projects (id) on delete set null,
   notes text
 );
-
 create table if not exists public.hour_logs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -195,7 +157,6 @@ create table if not exists public.hour_logs (
   note text,
   constraint hour_logs_user_date_category_key unique (user_id, log_date, category)
 );
-
 create table if not exists public.weekly_reviews (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -209,17 +170,8 @@ create table if not exists public.weekly_reviews (
   protected_university boolean,
   next_publish_or_apply text,
   created_at timestamptz not null default now(),
-  -- one review per week per user
-  constraint weekly_reviews_user_week_key unique (user_id, week_start)
+    constraint weekly_reviews_user_week_key unique (user_id, week_start)
 );
-
--- ---------------------------------------------------------------------------
--- Row Level Security: every table, all four operations, owner only.
--- status_history deliberately has NO insert policy: rows are written only by
--- the security-definer trigger in 0002_triggers.sql so the audit trail cannot
--- be forged directly.
--- ---------------------------------------------------------------------------
-
 do $$
 declare
   t text;
@@ -263,25 +215,6 @@ end
 $$;
 
 -- ======== 0002_triggers.sql ========
--- ============================================================================
--- Career Desk - Prompt 3: triggers
--- 1. Every change to jobs.status writes a status_history row (with time) and
---    refreshes jobs.status_updated_at.
--- 2. Approved application_documents can never be altered or deleted; the only
---    permitted change is marking them superseded. A sent document can never
---    be quietly edited.
--- ============================================================================
-
--- ---------------------------------------------------------------------------
--- 1. jobs.status -> status_history
---
--- Two triggers:
---   AFTER INSERT  - writes the creation row (after the job row exists, so the
---                   status_history foreign key is satisfied).
---   BEFORE UPDATE OF status - writes the transition row and refreshes
---                   status_updated_at (WHEN clause skips no-op changes).
--- ---------------------------------------------------------------------------
-
 create or replace function public.handle_job_status_insert()
 returns trigger
 language plpgsql
@@ -294,7 +227,6 @@ begin
   return new;
 end;
 $$;
-
 create or replace function public.handle_job_status_update()
 returns trigger
 language plpgsql
@@ -310,30 +242,17 @@ begin
   return new;
 end;
 $$;
-
 drop trigger if exists jobs_status_history_insert_trigger on public.jobs;
-
 create trigger jobs_status_history_insert_trigger
   after insert on public.jobs
   for each row
   execute function public.handle_job_status_insert();
-
 drop trigger if exists jobs_status_history_update_trigger on public.jobs;
-
 create trigger jobs_status_history_update_trigger
   before update of status on public.jobs
   for each row
   when (new.status is distinct from old.status)
   execute function public.handle_job_status_update();
-
--- ---------------------------------------------------------------------------
--- 2. Approved documents are immutable (except superseding)
---
--- 'approved' rows: only change allowed is status -> 'superseded'.
--- 'superseded' rows: fully locked. They were approved and may already have
--- been sent, so their content can never be rewritten either.
--- ---------------------------------------------------------------------------
-
 create or replace function public.protect_approved_application_documents()
 returns trigger
 language plpgsql
@@ -383,95 +302,60 @@ begin
   return new;
 end;
 $$;
-
 drop trigger if exists application_documents_protect_approved on public.application_documents;
-
 create trigger application_documents_protect_approved
   before update or delete on public.application_documents
   for each row
   execute function public.protect_approved_application_documents();
 
 -- ======== 0003_storage_documents_bucket.sql ========
--- ============================================================================
--- Career Desk - Prompt 3: private Storage bucket "documents"
--- Files live under <user_id>/... and each user can only read and write inside
--- their own folder. CVs, cover letters and later exports are stored here.
--- ============================================================================
-
 insert into storage.buckets (id, name, public)
 values ('documents', 'documents', false)
 on conflict (id) do update
   set public = false,
       file_size_limit = coalesce(storage.buckets.file_size_limit, 52428800);
-
 drop policy if exists "documents_select_own" on storage.objects;
-
-do $$ begin
-  execute 'create policy "documents_select_own"
+drop policy if exists "documents_select_own" on public.storage;
+create policy "documents_select_own"
   on storage.objects for select
   to authenticated
   using (
-    bucket_id = ''documents''
+    bucket_id = 'documents'
     and (storage.foldername(name))[1] = auth.uid()::text
-  )';
-exception
-  when duplicate_object then null;
-end $$;
-
+  );
 drop policy if exists "documents_insert_own" on storage.objects;
-
-do $$ begin
-  execute 'create policy "documents_insert_own"
+drop policy if exists "documents_insert_own" on public.storage;
+create policy "documents_insert_own"
   on storage.objects for insert
   to authenticated
   with check (
-    bucket_id = ''documents''
+    bucket_id = 'documents'
     and (storage.foldername(name))[1] = auth.uid()::text
-  )';
-exception
-  when duplicate_object then null;
-end $$;
-
+  );
 drop policy if exists "documents_update_own" on storage.objects;
-
-do $$ begin
-  execute 'create policy "documents_update_own"
+drop policy if exists "documents_update_own" on public.storage;
+create policy "documents_update_own"
   on storage.objects for update
   to authenticated
   using (
-    bucket_id = ''documents''
+    bucket_id = 'documents'
     and (storage.foldername(name))[1] = auth.uid()::text
   )
   with check (
-    bucket_id = ''documents''
+    bucket_id = 'documents'
     and (storage.foldername(name))[1] = auth.uid()::text
-  )';
-exception
-  when duplicate_object then null;
-end $$;
-
+  );
 drop policy if exists "documents_delete_own" on storage.objects;
-
-do $$ begin
-  execute 'create policy "documents_delete_own"
+drop policy if exists "documents_delete_own" on public.storage;
+create policy "documents_delete_own"
   on storage.objects for delete
   to authenticated
   using (
-    bucket_id = ''documents''
+    bucket_id = 'documents'
     and (storage.foldername(name))[1] = auth.uid()::text
-  )';
-exception
-  when duplicate_object then null;
-end $$;
+  );
 
 -- ======== 0004_user_settings.sql ========
--- ============================================================================
--- Career Desk - Prompt 4: user settings (banned-phrase list)
--- One row per user. The banned phrases feed the claim check and style rules.
--- Pre-filled with the spec's default list; the user can add and remove
--- entries in Settings.
--- ============================================================================
-
 create table if not exists public.user_settings (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null unique references auth.users (id) on delete cascade,
@@ -482,82 +366,42 @@ create table if not exists public.user_settings (
   }',
   created_at timestamptz not null default now()
 );
-
 alter table public.user_settings enable row level security;
-
 drop policy if exists user_settings_select_own on public.user_settings;
-
-do $$ begin
-  execute 'create policy user_settings_select_own
+drop policy if exists "user_settings_select_own" on public.user_settings;
+create policy user_settings_select_own
   on public.user_settings for select
   to authenticated
-  using (user_id = auth.uid())';
-exception
-  when duplicate_object then null;
-end $$;
-
+  using (user_id = auth.uid());
 drop policy if exists user_settings_insert_own on public.user_settings;
-
-do $$ begin
-  execute 'create policy user_settings_insert_own
+drop policy if exists "user_settings_insert_own" on public.user_settings;
+create policy user_settings_insert_own
   on public.user_settings for insert
   to authenticated
-  with check (user_id = auth.uid())';
-exception
-  when duplicate_object then null;
-end $$;
-
+  with check (user_id = auth.uid());
 drop policy if exists user_settings_update_own on public.user_settings;
-
-do $$ begin
-  execute 'create policy user_settings_update_own
+drop policy if exists "user_settings_update_own" on public.user_settings;
+create policy user_settings_update_own
   on public.user_settings for update
   to authenticated
   using (user_id = auth.uid())
-  with check (user_id = auth.uid())';
-exception
-  when duplicate_object then null;
-end $$;
-
+  with check (user_id = auth.uid());
 drop policy if exists user_settings_delete_own on public.user_settings;
-
-do $$ begin
-  execute 'create policy user_settings_delete_own
+drop policy if exists "user_settings_delete_own" on public.user_settings;
+create policy user_settings_delete_own
   on public.user_settings for delete
   to authenticated
-  using (user_id = auth.uid())';
-exception
-  when duplicate_object then null;
-end $$;
+  using (user_id = auth.uid());
 
 -- ======== 0005_job_extraction_fields.sql ========
--- ============================================================================
--- Career Desk - Prompt 5: job extraction fields + mark-as-applied
---
--- 1. Extra columns the job intake extraction needs. The spec's extraction
---    returns preferred skills, seniority, closing date, application
---    instructions and a one-line role family reason; the Prompt 3 schema had
---    nowhere to keep them, so they are added here rather than squeezed into
---    notes or required_skills.
---
--- 2. mark_job_applied(): one atomic, auditable operation used by the
---    "Mark as applied" button. It flips the job to 'applied' (which the
---    trigger records in status_history) and creates the applications row in
---    the same transaction. The app never submits applications on the user's
---    behalf: applied_manually is always true.
--- ============================================================================
-
 alter table public.jobs
   add column if not exists preferred_skills text[] not null default '{}',
   add column if not exists seniority text,
   add column if not exists closing_date date,
   add column if not exists application_instructions text,
   add column if not exists role_family_reason text;
-
--- One application per job (used by ON CONFLICT in mark_job_applied).
 create unique index if not exists applications_job_id_uniq
   on public.applications (job_id);
-
 create or replace function public.mark_job_applied(
   p_job_id uuid,
   p_applied_on date default current_date
@@ -592,23 +436,14 @@ begin
   on conflict (job_id) do nothing;
 end;
 $$;
-
 revoke all on function public.mark_job_applied(uuid, date) from public;
-
 grant execute on function public.mark_job_applied(uuid, date) to authenticated;
 
 -- ======== 0006_documents_plan_and_reminders.sql ========
--- ============================================================================
--- Career Desk - Prompt 8/9 additions: profile name, reminder settings, no
--- Sunday scheduling, and the document-verified mark_job_applied.
--- ============================================================================
-
 alter table public.user_settings
   add column if not exists full_name text,
   add column if not exists reminder_email text,
   add column if not exists reminders_enabled boolean not null default true;
-
--- Sunday is rest and cannot be scheduled (isodow 7 = Sunday).
 do $$
 begin
   if not exists (
@@ -621,12 +456,7 @@ begin
   end if;
 end
 $$;
-
--- mark_job_applied gains optional verified documents: when document ids are
--- supplied they must belong to the caller, be approved, and have an exported
--- PDF; their exact paths and SHA-256 hashes are copied into the application.
 drop function if exists public.mark_job_applied(uuid, date);
-
 create or replace function public.mark_job_applied(
   p_job_id uuid,
   p_applied_on date default current_date,
@@ -698,14 +528,8 @@ begin
   on conflict (job_id) do nothing;
 end;
 $$;
-
 revoke all on function public.mark_job_applied(uuid, date, uuid, uuid) from public;
-
 grant execute on function public.mark_job_applied(uuid, date, uuid, uuid) to authenticated;
-
--- Exported PDF bookkeeping: an approved row's content is immutable, but the
--- storage path and hash of the PDF generated FROM that content may be written
--- (and refreshed) by the export route. Nothing else may change.
 create or replace function public.protect_approved_application_documents()
 returns trigger
 language plpgsql
@@ -757,11 +581,6 @@ end;
 $$;
 
 -- ======== 0007_skills.sql ========
--- ============================================================================
--- Career Desk - Prompt 12: Skills Intelligence.
--- Skills become first-class data linked to the Career Record.
--- ============================================================================
-
 create table if not exists public.skills (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -784,7 +603,6 @@ create table if not exists public.skills (
   created_at timestamptz not null default now(),
   unique (user_id, name)
 );
-
 create table if not exists public.skill_evidence (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -799,7 +617,6 @@ create table if not exists public.skill_evidence (
   date date,
   created_at timestamptz not null default now()
 );
-
 create table if not exists public.skill_assessments (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -820,7 +637,6 @@ create table if not exists public.skill_assessments (
   created_at timestamptz not null default now(),
   decided_at timestamptz
 );
-
 create table if not exists public.role_skill_requirements (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -830,7 +646,6 @@ create table if not exists public.role_skill_requirements (
   importance text not null check (importance in ('essential', 'desirable')),
   seen_in_posting_text text
 );
-
 create table if not exists public.ai_assessments (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -842,58 +657,26 @@ create table if not exists public.ai_assessments (
   )),
   created_at timestamptz not null default now()
 );
-
 alter table public.skills enable row level security;
-
 alter table public.skill_evidence enable row level security;
-
 alter table public.skill_assessments enable row level security;
-
 alter table public.role_skill_requirements enable row level security;
-
 alter table public.ai_assessments enable row level security;
-
-do $$ begin
-  execute 'create policy "skills owner all" on public.skills
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid())';
-exception
-  when duplicate_object then null;
-end $$;
-
-do $$ begin
-  execute 'create policy "skill_evidence owner all" on public.skill_evidence
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid())';
-exception
-  when duplicate_object then null;
-end $$;
-
-do $$ begin
-  execute 'create policy "skill_assessments owner all" on public.skill_assessments
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid())';
-exception
-  when duplicate_object then null;
-end $$;
-
-do $$ begin
-  execute 'create policy "role_skill_requirements owner all" on public.role_skill_requirements
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid())';
-exception
-  when duplicate_object then null;
-end $$;
-
-do $$ begin
-  execute 'create policy "ai_assessments owner all" on public.ai_assessments
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid())';
-exception
-  when duplicate_object then null;
-end $$;
-
--- ============================================================================
--- Code-enforced rules (not just the AI's good behaviour):
--- 1. intermediate+ requires at least one employment or project evidence row.
--- 2. certificate/self_study/education evidence alone caps the level at basic.
--- ============================================================================
-
+drop policy if exists "skills owner all" on public.skills;
+create policy "skills owner all" on public.skills
+  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "skill_evidence owner all" on public.skill_evidence;
+create policy "skill_evidence owner all" on public.skill_evidence
+  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "skill_assessments owner all" on public.skill_assessments;
+create policy "skill_assessments owner all" on public.skill_assessments
+  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "role_skill_requirements owner all" on public.role_skill_requirements;
+create policy "role_skill_requirements owner all" on public.role_skill_requirements
+  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "ai_assessments owner all" on public.ai_assessments;
+create policy "ai_assessments owner all" on public.ai_assessments
+  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 create or replace function public.enforce_skill_level_rules()
 returns trigger
 language plpgsql
@@ -936,16 +719,10 @@ begin
   return new;
 end;
 $$;
-
 drop trigger if exists skills_level_rules on public.skills;
-
 create trigger skills_level_rules
   before insert or update of proficiency on public.skills
   for each row execute function public.enforce_skill_level_rules();
-
--- Also enforce when evidence rows are removed: dropping the last practical
--- evidence under an intermediate+ skill must fail rather than leave the
--- claim unsupported.
 create or replace function public.enforce_skill_evidence_rules()
 returns trigger
 language plpgsql
@@ -972,23 +749,12 @@ begin
   return coalesce(old, new);
 end;
 $$;
-
 drop trigger if exists skill_evidence_rules on public.skill_evidence;
-
 create trigger skill_evidence_rules
   before delete on public.skill_evidence
   for each row execute function public.enforce_skill_evidence_rules();
 
--- The spec's spec-skills seed data lives in code (lib/data/queries/skills.ts)
--- because names and categories are seeded per user on first visit.;
-
 -- ======== 0008_ai_usage.sql ========
--- ============================================================================
--- Career Desk - Prompt 13: AI usage ledger. Filled by the task runner from
--- each provider's usage fields; task name, duration and token counts are
--- logged, never prompt content.
--- ============================================================================
-
 create table if not exists public.ai_usage (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -1004,25 +770,14 @@ create table if not exists public.ai_usage (
   entries_used integer,
   created_at timestamptz not null default now()
 );
-
 alter table public.ai_usage enable row level security;
-
-do $$ begin
-  execute 'create policy "ai_usage owner all" on public.ai_usage
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid())';
-exception
-  when duplicate_object then null;
-end $$;
-
+drop policy if exists "ai_usage owner all" on public.ai_usage;
+create policy "ai_usage owner all" on public.ai_usage
+  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 create index if not exists ai_usage_user_created_idx
   on public.ai_usage (user_id, created_at desc);
 
 -- ======== 0009_eligibility.sql ========
--- ============================================================================
--- Career Desk - Prompt 14: International Eligibility Checker.
--- The candidate lives in South Africa; "remote" never means global.
--- ============================================================================
-
 alter table public.jobs
   add column if not exists employer_country text,
   add column if not exists eligible_countries text[] not null default '{}',
@@ -1046,10 +801,6 @@ alter table public.jobs
   add column if not exists eligibility_checked_at timestamptz;
 
 -- ======== 0010_quality.sql ========
--- ============================================================================
--- Career Desk - Prompt 22 (quality) + 23/24 settings columns.
--- ============================================================================
-
 create table if not exists public.corrections (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -1062,7 +813,6 @@ create table if not exists public.corrections (
   )),
   created_at timestamptz not null default now()
 );
-
 create table if not exists public.prompt_rules (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -1070,7 +820,6 @@ create table if not exists public.prompt_rules (
   active boolean not null default true,
   created_at timestamptz not null default now()
 );
-
 create table if not exists public.eval_cases (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -1079,35 +828,18 @@ create table if not exists public.eval_cases (
   expectations jsonb not null default '[]',
   created_at timestamptz not null default now()
 );
-
 alter table public.corrections enable row level security;
-
 alter table public.prompt_rules enable row level security;
-
 alter table public.eval_cases enable row level security;
-
-do $$ begin
-  execute 'create policy "corrections owner all" on public.corrections
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid())';
-exception
-  when duplicate_object then null;
-end $$;
-
-do $$ begin
-  execute 'create policy "prompt_rules owner all" on public.prompt_rules
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid())';
-exception
-  when duplicate_object then null;
-end $$;
-
-do $$ begin
-  execute 'create policy "eval_cases owner all" on public.eval_cases
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid())';
-exception
-  when duplicate_object then null;
-end $$;
-
--- Prompt 23: the salary floor; Prompt 24: spending cap and retention.
+drop policy if exists "corrections owner all" on public.corrections;
+create policy "corrections owner all" on public.corrections
+  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "prompt_rules owner all" on public.prompt_rules;
+create policy "prompt_rules owner all" on public.prompt_rules
+  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "eval_cases owner all" on public.eval_cases;
+create policy "eval_cases owner all" on public.eval_cases
+  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 alter table public.user_settings
   add column if not exists minimum_salary numeric(12, 2),
   add column if not exists minimum_salary_currency text,
@@ -1115,12 +847,6 @@ alter table public.user_settings
   add column if not exists recording_retention_days integer;
 
 -- ======== 0011_recommendation.sql ========
--- ============================================================================
--- Career Desk - Prompt 23: application prioritisation columns.
--- The recommendation is decided by rules in code; these columns store the
--- decision, the factor table that produced it and the owner's overrides.
--- ============================================================================
-
 alter table public.jobs
   add column if not exists recommendation text
     check (recommendation in (

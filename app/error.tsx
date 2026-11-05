@@ -25,9 +25,23 @@ export default function Error({
         problem keeps happening, check your connection and Supabase
         configuration.
       </p>
-      {error.digest ? (
+      {error.message ? (
+        <details className="max-w-md text-left">
+          <summary className="cursor-pointer text-xs font-medium text-stone-500">
+            Technical details
+          </summary>
+          <p className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-stone-100 p-3 text-xs text-stone-700">
+            {error.message}
+          </p>
+          {error.digest ? (
+            <p className="mt-1 text-xs text-stone-400">
+              Error reference: {error.digest}
+            </p>
+          ) : null}
+        </details>
+      ) : (
         <p className="text-xs text-stone-400">Error reference: {error.digest}</p>
-      ) : null}
+      )}
       <button onClick={reset} className="btn-primary">
         Try again
       </button>
