@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { SCHEMA_EXPECTATIONS } from "@/lib/data/schema-expectations";
 import { CopySqlButton } from "./copy-sql-button";
 
-type Db = SupabaseClient<any, "public", any>;
+type Db = SupabaseClient;
 
 type Problem = {
   table: string;

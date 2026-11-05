@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Database, Download, FileText, LogOut, Trash2 } from "lucide-react";
@@ -11,6 +12,7 @@ import { createClient } from "@/lib/data/supabase/browser";
  * of all sessions, and links to the AI data notice.
  */
 export function DataCard({ email }: { email: string | null }) {
+  const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
 
@@ -68,7 +70,7 @@ export function DataCard({ email }: { email: string | null }) {
             setBusy("signout");
             try {
               await createClient().auth.signOut({ scope: "global" });
-              window.location.href = "/login";
+              router.replace("/login");
             } catch {
               toast.error("Could not sign out.");
               setBusy(null);

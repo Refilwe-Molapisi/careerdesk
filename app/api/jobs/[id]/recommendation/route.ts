@@ -9,7 +9,6 @@ import {
 } from "@/lib/operations/prioritise";
 import { runTask } from "@/lib/intelligence/tasks";
 import "@/lib/intelligence/register-tasks";
-import { prioritySchema } from "@/lib/intelligence/tasks/priority";
 import { AiUnavailableError } from "@/lib/intelligence/deepseek";
 import { rateLimit } from "@/lib/operations/rate-limit";
 

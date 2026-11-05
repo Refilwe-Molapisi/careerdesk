@@ -13,7 +13,7 @@ export const metadata: Metadata = {
  * straight from ai_usage and the applications table.
  */
 export default async function UsagePage() {
-  const { user, supabase } = await requireUser();
+  const { supabase } = await requireUser();
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);

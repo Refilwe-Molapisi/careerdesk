@@ -1,6 +1,5 @@
 import JSZip from "jszip";
 import { requireUser } from "@/lib/data/auth";
-import { createClient } from "@/lib/data/supabase/server";
 import { dumpUserData, toCsv, EXPORT_TABLES } from "@/lib/operations/export-data";
 import { rateLimit } from "@/lib/operations/rate-limit";
 
